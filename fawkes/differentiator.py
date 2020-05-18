@@ -9,7 +9,7 @@ import time
 from decimal import Decimal
 import numpy as np
 import tensorflow as tf
-from .utils import preprocess, reverse_preprocess
+from utils import preprocess, reverse_preprocess
 
 
 class FawkesMaskGeneration:
@@ -391,7 +391,7 @@ class FawkesMaskGeneration:
                 if iteration != 0 and iteration % (self.MAX_ITERATIONS // 3) == 0:
                     LR = LR / 2
                     print("Learning Rate: ", LR)
-                # print out the losses every 10%
+
                 if iteration % (self.MAX_ITERATIONS // 10) == 0:
                     if self.verbose == 1:
                         loss_sum = float(self.sess.run(self.loss_sum))

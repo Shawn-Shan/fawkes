@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 import random
@@ -7,9 +8,24 @@ import keras.backend as K
 import numpy as np
 import tensorflow as tf
 from keras.applications.vgg16 import preprocess_input
+from keras.layers import Dense, Activation
+from keras.models import Model
 from keras.preprocessing import image
 from keras.utils import to_categorical
 from sklearn.metrics import pairwise_distances
+
+
+def clip_img(X, preprocessing='raw'):
+    X = reverse_preprocess(X, preprocessing)
+    X = np.clip(X, 0.0, 255.0)
+    X = preprocess(X, preprocessing)
+    return X
+
+
+def dump_dictionary_as_json(dict, outfile):
+    j = json.dumps(dict)
+    with open(outfile, "wb") as f:
+        f.write(j.encode())
 
 
 def fix_gpu_memory(mem_fraction=1):
@@ -23,6 +39,19 @@ def fix_gpu_memory(mem_fraction=1):
     sess.run(init_op)
     K.set_session(sess)
     return sess
+
+
+def load_victim_model(number_classes, teacher_model=None, end2end=False):
+    for l in teacher_model.layers:
+        l.trainable = end2end
+    x = teacher_model.layers[-1].output
+
+    x = Dense(number_classes)(x)
+    x = Activation('softmax', name="act")(x)
+    model = Model(teacher_model.input, x)
+    opt = keras.optimizers.Adadelta()
+    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+    return model
 
 
 def init_gpu(gpu_index, force=False):
@@ -152,93 +181,43 @@ def imagenet_reverse_preprocessing(x, data_format=None):
     return x
 
 
-def imagenet_reverse_preprocessing_cntk(x, data_format=None):
-    import keras.backend as K
-    """ Reverse preprocesses a tensor encoding a batch of images.
-    # Arguments
-        x: input Numpy tensor, 4D.
-        data_format: data format of the image tensor.
-    # Returns
-        Preprocessed tensor.
-    """
-    x = np.array(x)
-    if data_format is None:
-        data_format = K.image_data_format()
-    assert data_format in ('channels_last', 'channels_first')
+def build_bottleneck_model(model, cut_off):
+    bottleneck_model = Model(model.input, model.get_layer(cut_off).output)
+    bottleneck_model.compile(loss='categorical_crossentropy',
+                             optimizer='adam',
+                             metrics=['accuracy'])
+    return bottleneck_model
 
-    if data_format == 'channels_first':
-        # Zero-center by mean pixel
-        x[:, 0, :, :] += 114.0
-        x[:, 1, :, :] += 114.0
-        x[:, 2, :, :] += 114.0
-        # 'BGR'->'RGB'
-        x = x[:, ::-1, :, :]
+
+def load_extractor(name, layer_idx=None):
+    model = keras.models.load_model(name)
+
+    if "extract" in name.split("/")[-1]:
+        model = keras.models.load_model(name)
     else:
-        # Zero-center by mean pixel
-        x[:, :, :, 0] += 114.0
-        x[:, :, :, 1] += 114.0
-        x[:, :, :, 2] += 114.0
-        # 'BGR'->'RGB'
-        x = x[:, :, :, ::-1]
-    return x
+        print("Convert a model to a feature extractor")
+        model = build_bottleneck_model(model, model.layers[layer_idx].name)
+        model.save(name + "extract")
+        model = keras.models.load_model(name + "extract")
 
-
-def load_extractor(name):
-    model = keras.models.load_model("/home/shansixioing/cloak/models/extractors/{}_extract.h5".format(name))
     return model
 
 
 def get_dataset_path(dataset):
-    if dataset == "webface":
-        train_data_dir = '/mnt/data/sixiongshan/data/webface/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/webface/test'
-        number_classes = 10575
-        number_samples = 475137
-
-    elif dataset == "vggface1":
-        train_data_dir = '/mnt/data/sixiongshan/data/vggface/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/vggface/test'
-        number_classes = 2622
-        number_samples = 1716436 // 3
-
-    elif dataset == "vggface2":
-        train_data_dir = '/mnt/data/sixiongshan/data/vggface2/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/vggface2/test'
-        number_classes = 8631
-        number_samples = 3141890 // 3
-
-    elif dataset == "scrub":
-        train_data_dir = '/mnt/data/sixiongshan/data/facescrub/keras_flow_dir/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/facescrub/keras_flow_dir/test'
+    if dataset == "scrub":
+        train_data_dir = '../data/scrub/train'
+        test_data_dir = '../data/scrub/test'
         number_classes = 530
         number_samples = 57838
-
-    elif dataset == "youtubeface":
-        train_data_dir = '/mnt/data/sixiongshan/data/youtubeface/keras_flow_data/train_mtcnnpy_224'
-        test_data_dir = '/mnt/data/sixiongshan/data/youtubeface/keras_flow_data/test_mtcnnpy_224'
-        number_classes = 1283
-        number_samples = 587137 // 5
-
-    elif dataset == "emily":
-        train_data_dir = '/mnt/data/sixiongshan/data/emface/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/emface/test'
-        number_classes = 66
-        number_samples = 6070
-
     elif dataset == "pubfig":
-        train_data_dir = '/mnt/data/sixiongshan/data/pubfig/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/pubfig/test'
+        train_data_dir = '../data/pubfig/train'
+        test_data_dir = '../data/pubfig/test'
         number_classes = 65
         number_samples = 5979
-
-    elif dataset == "iris":
-        train_data_dir = '/mnt/data/sixiongshan/data/iris/train'
-        test_data_dir = '/mnt/data/sixiongshan/data/iris/test'
-        number_classes = 1000
-        number_samples = 14000
     else:
-        print("Dataset {} does not exist... Abort".format(dataset))
-        exit(1)
+        raise Exception(
+            "Dataset {} does not exist, please download to data/ and add the path to this function... Abort".format(
+                dataset))
 
     return train_data_dir, test_data_dir, number_classes, number_samples
 
@@ -261,7 +240,6 @@ class CloakData(object):
             self.protect_class = random.choice(self.all_labels)
 
         self.sybil_class = random.choice([l for l in self.all_labels if l != self.protect_class])
-        print("Protect label: {} | Sybil label: {}".format(self.protect_class, self.sybil_class))
         self.protect_train_X, self.protect_test_X = self.load_label_data(self.protect_class)
         self.sybil_train_X, self.sybil_test_X = self.load_label_data(self.sybil_class)
 
@@ -290,11 +268,11 @@ class CloakData(object):
 
     def load_embeddings(self, feature_extractors_names):
         dictionaries = []
-
         for extractor_name in feature_extractors_names:
-            path2emb = pickle.load(open("/home/shansixioing/cloak/embs/{}_emb_norm.p".format(extractor_name), "rb"))
-            # path2emb = pickle.load(open("/home/shansixioing/cloak/embs/vggface2_inception_emb.p".format(extractor_name), "rb"))
+            extractor_name = extractor_name.split("/")[-1].split('.')[0].replace("_extract", "")
+            path2emb = pickle.load(open("../feature_extractors/embeddings/{}_emb_norm.p".format(extractor_name), "rb"))
             dictionaries.append(path2emb)
+
         merge_dict = {}
         for k in dictionaries[0].keys():
             cur_emb = [dic[k] for dic in dictionaries]
