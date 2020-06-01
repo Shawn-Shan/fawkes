@@ -68,7 +68,6 @@ def init_gpu(gpu_index, force=False):
 
 
 def preprocess(X, method):
-    # assume color last
     assert method in {'raw', 'imagenet', 'inception', 'mnist'}
 
     if method is 'raw':
@@ -82,7 +81,6 @@ def preprocess(X, method):
 
 
 def reverse_preprocess(X, method):
-    # assume color last
     assert method in {'raw', 'imagenet', 'inception', 'mnist'}
 
     if method is 'raw':
@@ -146,13 +144,6 @@ def imagenet_preprocessing(x, data_format=None):
 
 def imagenet_reverse_preprocessing(x, data_format=None):
     import keras.backend as K
-    """ Reverse preprocesses a tensor encoding a batch of images.
-    # Arguments
-        x: input Numpy tensor, 4D.
-        data_format: data format of the image tensor.
-    # Returns
-        Preprocessed tensor.
-    """
     x = np.array(x)
     if data_format is None:
         data_format = K.image_data_format()
@@ -189,37 +180,32 @@ def build_bottleneck_model(model, cut_off):
     return bottleneck_model
 
 
-def load_extractor(name, layer_idx=None):
-    model = keras.models.load_model(name)
-
-    if "extract" in name.split("/")[-1]:
-        model = keras.models.load_model(name)
-    else:
-        print("Convert a model to a feature extractor")
-        model = build_bottleneck_model(model, model.layers[layer_idx].name)
-        model.save(name + "extract")
-        model = keras.models.load_model(name + "extract")
-
+def load_extractor(name):
+    model = keras.models.load_model("../feature_extractors/{}.h5".format(name))
+    if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
+        raise Exception(
+            "Given extractor's last layer is softmax, need to remove the top layers to make it into a feature extractor")
+    # if "extract" in name.split("/")[-1]:
+    #     pass
+    # else:
+    #     print("Convert a model to a feature extractor")
+    #     model = build_bottleneck_model(model, model.layers[layer_idx].name)
+    #     model.save(name + "extract")
+    #     model = keras.models.load_model(name + "extract")
     return model
 
 
 def get_dataset_path(dataset):
-    if dataset == "scrub":
-        train_data_dir = '../data/scrub/train'
-        test_data_dir = '../data/scrub/test'
-        number_classes = 530
-        number_samples = 57838
-    elif dataset == "pubfig":
-        train_data_dir = '../data/pubfig/train'
-        test_data_dir = '../data/pubfig/test'
-        number_classes = 65
-        number_samples = 5979
-    else:
+    if not os.path.exists("config.json"):
+        raise Exception("Please config the datasets before running protection code. See more in README and config.py.")
+
+    config = json.load(open("config.json", 'r'))
+    if dataset not in config:
         raise Exception(
             "Dataset {} does not exist, please download to data/ and add the path to this function... Abort".format(
                 dataset))
-
-    return train_data_dir, test_data_dir, number_classes, number_samples
+    return config[dataset]['train_dir'], config[dataset]['test_dir'], config[dataset]['num_classes'], config[dataset][
+        'num_images']
 
 
 def normalize(x):
@@ -227,10 +213,9 @@ def normalize(x):
 
 
 class CloakData(object):
-    def __init__(self, dataset, img_shape=(224, 224), target_selection_tries=30, protect_class=None):
+    def __init__(self, dataset, img_shape=(224, 224), protect_class=None):
         self.dataset = dataset
         self.img_shape = img_shape
-        self.target_selection_tries = target_selection_tries
 
         self.train_data_dir, self.test_data_dir, self.number_classes, self.number_samples = get_dataset_path(dataset)
         self.all_labels = sorted(list(os.listdir(self.train_data_dir)))
@@ -269,7 +254,6 @@ class CloakData(object):
     def load_embeddings(self, feature_extractors_names):
         dictionaries = []
         for extractor_name in feature_extractors_names:
-            extractor_name = extractor_name.split("/")[-1].split('.')[0].replace("_extract", "")
             path2emb = pickle.load(open("../feature_extractors/embeddings/{}_emb_norm.p".format(extractor_name), "rb"))
             dictionaries.append(path2emb)
 
@@ -288,14 +272,14 @@ class CloakData(object):
         embs = [p[1] for p in items]
         embs = np.array(embs)
 
-        pair_dist = pairwise_distances(original_feature_x, embs, 'l2')
+        pair_dist = pairwise_distances(original_feature_x, embs, metric)
         max_sum = np.min(pair_dist, axis=0)
         sorted_idx = np.argsort(max_sum)[::-1]
 
         highest_num = 0
         paired_target_X = None
         final_target_class_path = None
-        for idx in sorted_idx[:2]:
+        for idx in sorted_idx[:5]:
             target_class_path = paths[idx]
             cur_target_X = self.load_dir(target_class_path)
             cur_target_X = np.concatenate([cur_target_X, cur_target_X, cur_target_X])

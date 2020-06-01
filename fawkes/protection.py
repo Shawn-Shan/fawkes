@@ -9,13 +9,12 @@ from differentiator import FawkesMaskGeneration
 from tensorflow import set_random_seed
 from utils import load_extractor, CloakData, init_gpu
 
-#
 random.seed(12243)
 np.random.seed(122412)
 set_random_seed(12242)
 
-NUM_IMG_PROTECTED = 10  # Number of images used to optimize the target class
-BATCH_SIZE = 10
+NUM_IMG_PROTECTED = 32  # Number of images used to optimize the target class
+BATCH_SIZE = 32
 
 IMG_SHAPE = [224, 224, 3]
 
@@ -53,16 +52,13 @@ def perform_defense():
     num_protect = NUM_IMG_PROTECTED
 
     print("Loading {} for optimization".format(args.feature_extractor))
-    feature_extractors_ls = [load_extractor(name, layer_idx=args.layer_idx) for name in FEATURE_EXTRACTORS]
+    feature_extractors_ls = [load_extractor(name) for name in FEATURE_EXTRACTORS]
     protect_class = args.protect_class
 
     cloak_data = CloakData(args.dataset, target_selection_tries=1, protect_class=protect_class)
     model_name = args.feature_extractor.split("/")[-1].split('.')[0].replace("_extract", "")
-    RES_FILE_NAME = "{}_{}_protect{}_th{}_sd{}".format(args.dataset, model_name, cloak_data.protect_class, args.th,
-                                                       args.sd)
+    RES_FILE_NAME = "{}_{}_protect{}".format(args.dataset, model_name, cloak_data.protect_class)
     RES_FILE_NAME = os.path.join(RES_DIR, RES_FILE_NAME)
-    if os.path.exists(RES_FILE_NAME):
-        exit(1)
     print("Protect Class: ", cloak_data.protect_class)
 
     cloak_data.target_path, cloak_data.target_data = cloak_data.select_target_label(feature_extractors_ls,
@@ -88,13 +84,9 @@ def parse_arguments(argv):
                         help='name of dataset', default='scrub')
     parser.add_argument('--feature-extractor', type=str,
                         help="name of the feature extractor used for optimization",
-                        default="../feature_extractors/webface_dense_robust_extract.h5")
-    parser.add_argument('--layer-idx', type=int,
-                        help="the idx of the layer of neuron that are used as feature space",
-                        default=-3)
-
-    parser.add_argument('--th', type=float, default=0.01)
-    parser.add_argument('--sd', type=int, default=1e4)
+                        default="webface_dense_robust")
+    parser.add_argument('--th', type=float, default=0.007)
+    parser.add_argument('--sd', type=int, default=1e5)
     parser.add_argument('--protect_class', type=str, default=None)
     parser.add_argument('--lr', type=float, default=0.1)
 
