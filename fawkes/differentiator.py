@@ -7,6 +7,7 @@
 import datetime
 import time
 from decimal import Decimal
+
 import numpy as np
 import tensorflow as tf
 from utils import preprocess, reverse_preprocess

@@ -102,9 +102,6 @@ def main():
     else:
         raise ValueError
 
-    CLOAK_DIR = CLOAK_DIR + "_th{}_sd{}".format(args.th, int(args.sd))
-    print(CLOAK_DIR)
-
     CLOAK_DIR = os.path.join("../results", CLOAK_DIR)
     RES = pickle.load(open(os.path.join(CLOAK_DIR, "cloak_data.p"), 'rb'))
 
@@ -127,7 +124,7 @@ def main():
 
     try:
         model.fit_generator(train_generator, steps_per_epoch=cloak_data.number_samples // 32,
-                            validation_data=(original_X, original_Y), epochs=args.n_epochs, verbose=1,
+                            validation_data=(original_X, original_Y), epochs=args.n_epochs, verbose=2,
                             use_multiprocessing=False, workers=1)
     except KeyboardInterrupt:
         pass
@@ -144,7 +141,8 @@ def main():
     print("Accuracy on other classes {:.4f}".format(other_acc))
     EVAL_RES['other_acc'] = other_acc
     dump_dictionary_as_json(EVAL_RES,
-                            os.path.join(CLOAK_DIR, "eval_seed{}_th{}.json".format(args.seed_idx, args.th)))
+                            os.path.join(CLOAK_DIR,
+                                         "eval_seed{}_th{}_sd{}.json".format(args.seed_idx, args.th, args.sd)))
 
 
 def parse_arguments(argv):
@@ -158,7 +156,7 @@ def parse_arguments(argv):
                         help='name of dataset', default='scrub')
     parser.add_argument('--cloak_data', type=str,
                         help='name of the cloak result directory',
-                        default='scrub_webface_dense_robust_protectPatrick_Dempsey')
+                        default='scrub_webface_dense_robust_protectKristen_Alderson')
 
     parser.add_argument('--sd', type=int, default=1e6)
     parser.add_argument('--th', type=float, default=0.01)
@@ -167,7 +165,7 @@ def parse_arguments(argv):
                         help='student model', default='../feature_extractors/vggface2_inception_extract.h5')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--validation_split', type=float, default=0.1)
-    parser.add_argument('--n_epochs', type=int, default=3)
+    parser.add_argument('--n_epochs', type=int, default=5)
     return parser.parse_args(argv)
 
 
