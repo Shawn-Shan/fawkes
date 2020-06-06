@@ -16,8 +16,6 @@ set_random_seed(12242)
 NUM_IMG_PROTECTED = 32  # Number of images used to optimize the target class
 BATCH_SIZE = 32
 
-IMG_SHAPE = [224, 224, 3]
-
 MAX_ITER = 1000
 
 
@@ -34,7 +32,7 @@ def diff_protected_data(sess, feature_extractors_ls, image_X, number_protect, ta
                                           verbose=1, maximize=False, keep_final=False, image_shape=image_X.shape[1:])
 
     if len(target_X) < len(image_X):
-        target_X = np.concatenate([target_X, target_X, target_X, target_X, target_X])
+        target_X = np.concatenate([target_X, target_X, target_X])
     target_X = target_X[:len(image_X)]
     cloaked_image_X = differentiator.attack(image_X, target_X)
     return cloaked_image_X
@@ -55,9 +53,8 @@ def perform_defense():
     feature_extractors_ls = [load_extractor(name) for name in FEATURE_EXTRACTORS]
     protect_class = args.protect_class
 
-    cloak_data = CloakData(args.dataset, target_selection_tries=1, protect_class=protect_class)
-    model_name = args.feature_extractor.split("/")[-1].split('.')[0].replace("_extract", "")
-    RES_FILE_NAME = "{}_{}_protect{}".format(args.dataset, model_name, cloak_data.protect_class)
+    cloak_data = CloakData(args.dataset, protect_class=protect_class)
+    RES_FILE_NAME = "{}_{}_protect{}".format(args.dataset, args.feature_extractor, cloak_data.protect_class)
     RES_FILE_NAME = os.path.join(RES_DIR, RES_FILE_NAME)
     print("Protect Class: ", cloak_data.protect_class)
 
@@ -84,7 +81,7 @@ def parse_arguments(argv):
                         help='name of dataset', default='scrub')
     parser.add_argument('--feature-extractor', type=str,
                         help="name of the feature extractor used for optimization",
-                        default="webface_dense_robust")
+                        default="webface_dense_robust_extract")
     parser.add_argument('--th', type=float, default=0.007)
     parser.add_argument('--sd', type=int, default=1e5)
     parser.add_argument('--protect_class', type=str, default=None)
