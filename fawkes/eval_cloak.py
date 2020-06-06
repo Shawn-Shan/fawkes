@@ -20,8 +20,6 @@ from keras.applications.vgg16 import preprocess_input
 # loc = locale.getlocale()
 # locale.setlocale(locale.LC_ALL, loc)
 
-SEEDS = [12345, 23451, 34512, 45123, 51234, 54321, 43215, 32154, 21543, 15432]
-
 
 def select_samples(data_dir):
     all_data_path = []
@@ -88,9 +86,6 @@ def eval_cloaked_test_data(cloak_data, n_classes, validation_split=0.1):
 
 
 def main():
-    SEED = SEEDS[args.seed_idx]
-    random.seed(SEED)
-    set_random_seed(SEED)
     init_gpu(args.gpu)
 
     if args.dataset == 'pubfig':
@@ -133,36 +128,24 @@ def main():
     print("Accuracy on uncloaked/original images TEST: {:.4f}".format(acc_original))
     EVAL_RES['acc_original'] = acc_original
 
-    _, acc_cloaked = model.evaluate(cloaked_test_X, cloaked_test_Y, verbose=0)
-    print("Accuracy on cloaked images TEST: {:.4f}".format(acc_cloaked))
-    EVAL_RES['acc_cloaked'] = acc_cloaked
-
     _, other_acc = model.evaluate_generator(test_generator, verbose=0, steps=50)
     print("Accuracy on other classes {:.4f}".format(other_acc))
     EVAL_RES['other_acc'] = other_acc
-    dump_dictionary_as_json(EVAL_RES,
-                            os.path.join(CLOAK_DIR,
-                                         "eval_seed{}_th{}_sd{}.json".format(args.seed_idx, args.th, args.sd)))
+    dump_dictionary_as_json(EVAL_RES, os.path.join(CLOAK_DIR, "eval_seed{}.json".format(args.seed_idx)))
 
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--gpu', type=str,
-                        help='GPU id', default='2')
-    parser.add_argument('--seed_idx', type=int,
-                        help='random seed index', default=0)
+                        help='GPU id', default='0')
     parser.add_argument('--dataset', type=str,
                         help='name of dataset', default='scrub')
     parser.add_argument('--cloak_data', type=str,
                         help='name of the cloak result directory',
-                        default='scrub_webface_dense_robust_protectKristen_Alderson')
-
-    parser.add_argument('--sd', type=int, default=1e6)
-    parser.add_argument('--th', type=float, default=0.01)
-
+                        default='scrub_webface_dense_robust_extract_protectPatrick_Dempsey')
     parser.add_argument('--transfer_model', type=str,
-                        help='student model', default='../feature_extractors/vggface2_inception_extract.h5')
+                        help='the feature extractor used for tracker model training. It can be the same or not same as the user\'s', default='vggface2_inception_extract')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--validation_split', type=float, default=0.1)
     parser.add_argument('--n_epochs', type=int, default=5)
@@ -172,4 +155,3 @@ def parse_arguments(argv):
 if __name__ == '__main__':
     args = parse_arguments(sys.argv[1:])
     main()
-# python3 eval_cloak.py --gpu 2 --n_uncloaked 0 --dataset pubfig --model_idx 5 --transfer_model webface_inception
