@@ -44,3 +44,14 @@ The code will output a directory in `results/` with `cloak_data.p` inside. You c
 To evaluate the cloak, run `python3 fawkes/eval_cloak.py --gpu 0 --cloak_data PATH-TO-RESULT-DIRECTORY --transfer_model vggface2_inception_extract`. 
 
 The code will print out the tracker model accuracy on uncloaked/original test images of the protected user, which should be close to 0. 
+
+
+### Citation
+```
+@inproceedings{shan2020fawkes,
+  title={Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models},
+  author={Shan, Shawn and Wenger, Emily and Zhang, Jiayun and Li, Huiying and Zheng, Haitao and Zhao, Ben Y},
+  booktitle="Proc. of USENIX Security",
+  year={2020}
+}
+```
