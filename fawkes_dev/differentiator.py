@@ -136,21 +136,18 @@ class FawkesMaskGeneration:
         def batch_gen_DSSIM(aimg_raw_split, simg_raw_split):
             msssim_split = tf.image.ssim(aimg_raw_split, simg_raw_split, max_val=255.0)
             dist = (1.0 - tf.stack(msssim_split)) / 2.0
-            # dist = tf.square(aimg_raw_split - simg_raw_split)
             return dist
 
         # raw value of DSSIM distance
         self.dist_raw = batch_gen_DSSIM(self.aimg_raw, self.simg_raw)
         # distance value after applying threshold
         self.dist = tf.maximum(self.dist_raw - self.l_threshold, 0.0)
-        # self.dist = self.dist_raw
+
         self.dist_raw_sum = tf.reduce_sum(
             tf.where(self.mask,
                      self.dist_raw,
                      tf.zeros_like(self.dist_raw)))
         self.dist_sum = tf.reduce_sum(tf.where(self.mask, self.dist, tf.zeros_like(self.dist)))
-        # self.dist_sum = 1e-5 * tf.reduce_sum(self.dist)
-        # self.dist_raw_sum = self.dist_sum
 
         def resize_tensor(input_tensor, model_input_shape):
             if input_tensor.shape[1:] == model_input_shape or model_input_shape[1] is None:
@@ -161,6 +158,12 @@ class FawkesMaskGeneration:
         def calculate_direction(bottleneck_model, cur_timg_input, cur_simg_input):
             target_features = bottleneck_model(cur_timg_input)
             return target_features
+            # target_center = tf.reduce_mean(target_features, axis=0)
+            # original = bottleneck_model(cur_simg_input)
+            # original_center = tf.reduce_mean(original, axis=0)
+            # direction = target_center - original_center
+            # final_target = original + self.ratio * direction
+            # return final_target
 
         self.bottlesim = 0.0
         self.bottlesim_sum = 0.0
@@ -198,14 +201,7 @@ class FawkesMaskGeneration:
         else:
             self.loss = self.const * tf.square(self.dist) + self.bottlesim
 
-        self.loss_sum = tf.reduce_sum(tf.where(self.mask,
-                                               self.loss,
-                                               tf.zeros_like(self.loss)))
-
-        # self.loss_sum = self.dist_sum + tf.reduce_sum(self.bottlesim)
-        # import pdb
-        # pdb.set_trace()
-        # self.loss_sum = tf.reduce_sum(tf.where(self.mask, self.loss, tf.zeros_like(self.loss)))
+        self.loss_sum = tf.reduce_sum(tf.where(self.mask, self.loss, tf.zeros_like(self.loss)))
 
         # Setup the Adadelta optimizer and keep track of variables
         # we're creating
@@ -325,13 +321,25 @@ class FawkesMaskGeneration:
         weights_batch[:nb_imgs] = weights[:nb_imgs]
         modifier_batch = np.ones(self.input_shape) * 1e-6
 
-        self.sess.run(self.setup,
-                      {self.assign_timg_tanh: timg_tanh_batch,
-                       self.assign_simg_tanh: simg_tanh_batch,
-                       self.assign_const: CONST,
-                       self.assign_mask: mask,
-                       self.assign_weights: weights_batch,
-                       self.assign_modifier: modifier_batch})
+        # set the variables so that we don't have to send them over again
+        if self.MIMIC_IMG:
+            self.sess.run(self.setup,
+                          {self.assign_timg_tanh: timg_tanh_batch,
+                           self.assign_simg_tanh: simg_tanh_batch,
+                           self.assign_const: CONST,
+                           self.assign_mask: mask,
+                           self.assign_weights: weights_batch,
+                           self.assign_modifier: modifier_batch})
+        else:
+            # if directly mimicking a vector, use assign_bottleneck_t_raw
+            # in setup
+            self.sess.run(self.setup,
+                          {self.assign_bottleneck_t_raw: timg_tanh_batch,
+                           self.assign_simg_tanh: simg_tanh_batch,
+                           self.assign_const: CONST,
+                           self.assign_mask: mask,
+                           self.assign_weights: weights_batch,
+                           self.assign_modifier: modifier_batch})
 
         best_bottlesim = [0] * nb_imgs if self.maximize else [np.inf] * nb_imgs
         best_adv = np.zeros_like(source_imgs)
@@ -382,7 +390,7 @@ class FawkesMaskGeneration:
                         best_adv[e] = aimg_input
 
                 if iteration != 0 and iteration % (self.MAX_ITERATIONS // 3) == 0:
-                    # LR = LR / 2
+                    LR = LR / 2
                     print("Learning Rate: ", LR)
 
                 if iteration % (self.MAX_ITERATIONS // 10) == 0:
