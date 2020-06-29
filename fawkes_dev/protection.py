@@ -13,7 +13,7 @@ random.seed(12243)
 np.random.seed(122412)
 set_random_seed(12242)
 
-NUM_IMG_PROTECTED = 32  # Number of images used to optimize the target class
+NUM_IMG_PROTECTED = 400  # Number of images used to optimize the target class
 BATCH_SIZE = 32
 
 MAX_ITER = 1000

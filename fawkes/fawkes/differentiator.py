@@ -211,8 +211,8 @@ class FawkesMaskGeneration:
         # we're creating
         start_vars = set(x.name for x in tf.global_variables())
         self.learning_rate_holder = tf.placeholder(tf.float32, shape=[])
-        # optimizer = tf.train.AdadeltaOptimizer(self.learning_rate_holder)
-        optimizer = tf.train.AdamOptimizer(self.learning_rate_holder)
+        optimizer = tf.train.AdadeltaOptimizer(self.learning_rate_holder)
+        # optimizer = tf.train.AdamOptimizer(self.learning_rate_holder)
 
         self.train = optimizer.minimize(self.loss_sum,
                                         var_list=[self.modifier])
@@ -250,8 +250,6 @@ class FawkesMaskGeneration:
 
         imgs = reverse_preprocess(imgs, self.intensity_range)
         imgs = np.clip(imgs, 0, self.max_val)
-        imgs = np.rint(imgs)
-
         imgs = preprocess(imgs, self.intensity_range)
 
         return imgs
