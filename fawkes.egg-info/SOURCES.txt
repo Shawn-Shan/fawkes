@@ -1,0 +1,10 @@
+README.md
+setup.py
+fawkes/__init__.py
+fawkes/differentiator.py
+fawkes/protection.py
+fawkes/utils.py
+fawkes.egg-info/PKG-INFO
+fawkes.egg-info/SOURCES.txt
+fawkes.egg-info/dependency_links.txt
+fawkes.egg-info/top_level.txt

@@ -13,7 +13,7 @@ from keras.models import Model
 from keras.preprocessing import image
 from keras.utils import to_categorical
 from sklearn.metrics import pairwise_distances
-
+# from keras.utils import get_file
 
 def clip_img(X, preprocessing='raw'):
     X = reverse_preprocess(X, preprocessing)
@@ -170,6 +170,7 @@ def imagenet_reverse_preprocessing(x, data_format=None):
         # 'BGR'->'RGB'
         x = x[..., ::-1]
     return x
+
 
 
 def build_bottleneck_model(model, cut_off):

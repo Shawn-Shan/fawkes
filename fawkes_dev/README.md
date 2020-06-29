@@ -46,6 +46,13 @@ To evaluate the cloak, run `python3 fawkes/eval_cloak.py --gpu 0 --cloak_data PA
 The code will print out the tracker model accuracy on uncloaked/original test images of the protected user, which should be close to 0. 
 
 
+#### Exisiting Feature extractors
+
+We shared three different feature extractors under feature_extractors/
+1. low_extract.h5: trained on WebFace dataset with DenseNet architecture. 
+2. mid_extract.h5: VGGFace2 dataset with DenseNet architecture. Trained with PGD adversarial training for 5 epochs. 
+3. high_extract.h5: WebFace dataset with DenseNet architecture. Trained with PGD adversarial training for 20 epochs. 
+
 ### Citation
 ```
 @inproceedings{shan2020fawkes,
