@@ -3,8 +3,8 @@ import json
 import os
 
 DATASETS = {
+    "pubfig": "../data/pubfig",
     "scrub": "/home/shansixioing/cloak/fawkes/data/scrub/",
-    # "vggface1": "/mnt/data/sixiongshan/data/vggface/",
     "vggface2": "/mnt/data/sixiongshan/data/vggface2/",
     "webface": "/mnt/data/sixiongshan/data/webface/",
     "youtubeface": "/mnt/data/sixiongshan/data/youtubeface/keras_flow_data/",

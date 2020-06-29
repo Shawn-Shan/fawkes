@@ -83,9 +83,9 @@ def parse_arguments(argv):
                         help="name of the feature extractor used for optimization",
                         default="webface_dense_robust_extract")
     parser.add_argument('--th', type=float, default=0.007)
-    parser.add_argument('--sd', type=int, default=1e5)
+    parser.add_argument('--sd', type=int, default=1e9)
     parser.add_argument('--protect_class', type=str, default=None)
-    parser.add_argument('--lr', type=float, default=0.1)
+    parser.add_argument('--lr', type=float, default=1)
 
     return parser.parse_args(argv)
 

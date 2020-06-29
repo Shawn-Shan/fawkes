@@ -44,7 +44,7 @@ def main():
     for k, v in path2emb.items():
         path2emb[k] = normalize(v)
 
-    pickle.dump(path2emb, open("../feature_extractors/embeddings/{}_emb_norm.p".format(args.feature_extractor), "wb"))
+    pickle.dump(path2emb, open("../feature_extractors/embeddings/{}_emb.p".format(args.feature_extractor), "wb"))
 
 
 def parse_arguments(argv):

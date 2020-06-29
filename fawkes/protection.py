@@ -37,19 +37,34 @@ def generate_cloak_images(sess, feature_extractors, image_X, target_X=None, th=0
     return cloaked_image_X
 
 
+def get_mode_config(mode):
+    if mode == 'low':
+        args.feature_extractor = "low_extract"
+        args.th = 0.001
+    elif mode == 'mid':
+        args.feature_extractor = "mid_extract"
+        args.th = 0.001
+    elif mode == 'high':
+        args.feature_extractor = "high_extract"
+        args.th = 0.005
+    elif mode == 'ultra':
+        args.feature_extractor = "high_extract"
+        args.th = 0.007
+    elif mode == 'custom':
+        pass
+    else:
+        raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
+
+
 def extract_faces(img):
-    #  foo
+    #  wait on Huiying
     return preprocess_input(resize(img, (224, 224)))
 
 
 def fawkes():
-    assert os.path.exists(args.directory)
-    assert os.path.isdir(args.directory)
+    get_mode_config(args.mode)
 
     sess = init_gpu(args.gpu)
-
-    print("Loading {} for optimization".format(args.feature_extractor))
-
     feature_extractors_ls = [load_extractor(args.feature_extractor)]
 
     image_paths = glob.glob(os.path.join(args.directory, "*"))
@@ -70,10 +85,6 @@ def fawkes():
     else:
         target_images = select_target_label(orginal_images, feature_extractors_ls, [args.feature_extractor])
 
-    # file_name = args.directory.split("/")[-1]
-    # os.makedirs(args.result_directory, exist_ok=True)
-    # os.makedirs(os.path.join(args.result_directory, file_name), exist_ok=True)
-
     protected_images = generate_cloak_images(sess, feature_extractors_ls, orginal_images,
                                              target_X=target_images, th=args.th)
 
@@ -85,18 +96,20 @@ def fawkes():
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', type=str,
-                        help='GPU id', default='0')
     parser.add_argument('--directory', type=str,
                         help='directory that contain images for cloaking', default='imgs/')
 
+    parser.add_argument('--gpu', type=str,
+                        help='GPU id', default='0')
+
+    parser.add_argument('--mode', type=str,
+                        help='cloak generation mode', default='mid')
     parser.add_argument('--feature-extractor', type=str,
                         help="name of the feature extractor used for optimization",
-                        default="webface_dense_robust_extract")
+                        default="mid_extract")
 
     parser.add_argument('--th', type=float, default=0.005)
     parser.add_argument('--sd', type=int, default=1e9)
-    parser.add_argument('--protect_class', type=str, default=None)
     parser.add_argument('--lr', type=float, default=1)
 
     parser.add_argument('--result_directory', type=str, default="../results")
