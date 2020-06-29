@@ -16,12 +16,13 @@ random.seed(12243)
 np.random.seed(122412)
 set_random_seed(12242)
 
-BATCH_SIZE = 32
+BATCH_SIZE = 1
 MAX_ITER = 1000
 
 
 def generate_cloak_images(sess, feature_extractors, image_X, target_X=None, th=0.01):
     batch_size = BATCH_SIZE if len(image_X) > BATCH_SIZE else len(image_X)
+
     differentiator = FawkesMaskGeneration(sess, feature_extractors,
                                           batch_size=batch_size,
                                           mimic_img=True,
@@ -66,8 +67,6 @@ def fawkes():
             tar_img = select_target_label(org_img, feature_extractors_ls, [args.feature_extractor])
             target_images.append(tar_img)
         target_images = np.concatenate(target_images)
-        # import pdb
-        # pdb.set_trace()
     else:
         target_images = select_target_label(orginal_images, feature_extractors_ls, [args.feature_extractor])
 
@@ -80,7 +79,6 @@ def fawkes():
 
     for p_img, path in zip(protected_images, image_paths):
         p_img = reverse_process_cloaked(p_img)
-        # img_type = path.split(".")[-1]
         file_name = "{}_cloaked.jpeg".format(".".join(path.split(".")[:-1]))
         dump_image(p_img, file_name, format="JPEG")
 
@@ -97,9 +95,9 @@ def parse_arguments(argv):
                         default="webface_dense_robust_extract")
 
     parser.add_argument('--th', type=float, default=0.005)
-    parser.add_argument('--sd', type=int, default=1e10)
+    parser.add_argument('--sd', type=int, default=1e9)
     parser.add_argument('--protect_class', type=str, default=None)
-    parser.add_argument('--lr', type=float, default=0.1)
+    parser.add_argument('--lr', type=float, default=1)
 
     parser.add_argument('--result_directory', type=str, default="../results")
     parser.add_argument('--seperate_target', action='store_true')

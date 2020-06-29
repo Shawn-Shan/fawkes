@@ -297,7 +297,6 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
         if cur_tot_sum > highest_num:
             highest_num = cur_tot_sum
             paired_target_X = cur_paired_target_X
-            final_target_class_path = target_class_path
 
     np.random.shuffle(paired_target_X)
     paired_target_X = list(paired_target_X)
