@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import numpy as np
 import tensorflow as tf
-from utils import preprocess, reverse_preprocess
+from .utils import preprocess, reverse_preprocess
 
 
 class FawkesMaskGeneration:
@@ -47,7 +47,7 @@ class FawkesMaskGeneration:
                  max_iterations=MAX_ITERATIONS, initial_const=INITIAL_CONST,
                  intensity_range=INTENSITY_RANGE, l_threshold=L_THRESHOLD,
                  max_val=MAX_VAL, keep_final=KEEP_FINAL, maximize=MAXIMIZE, image_shape=IMAGE_SHAPE,
-                 verbose=0, ratio=RATIO, limit_dist=LIMIT_DIST):
+                 verbose=0, ratio=RATIO, limit_dist=LIMIT_DIST, faces=None):
 
         assert intensity_range in {'raw', 'imagenet', 'inception', 'mnist'}
 
@@ -69,10 +69,12 @@ class FawkesMaskGeneration:
         self.ratio = ratio
         self.limit_dist = limit_dist
         self.single_shape = list(image_shape)
+        self.faces = faces
 
         self.input_shape = tuple([self.batch_size] + self.single_shape)
 
         self.bottleneck_shape = tuple([self.batch_size] + self.single_shape)
+        # self.bottleneck_shape = tuple([self.batch_size, bottleneck_model_ls[0].output_shape[-1]])
 
         # the variable we're going to optimize over
         self.modifier = tf.Variable(np.zeros(self.input_shape, dtype=np.float32))
@@ -149,8 +151,6 @@ class FawkesMaskGeneration:
                      self.dist_raw,
                      tf.zeros_like(self.dist_raw)))
         self.dist_sum = tf.reduce_sum(tf.where(self.mask, self.dist, tf.zeros_like(self.dist)))
-        # self.dist_sum = 1e-5 * tf.reduce_sum(self.dist)
-        # self.dist_raw_sum = self.dist_sum
 
         def resize_tensor(input_tensor, model_input_shape):
             if input_tensor.shape[1:] == model_input_shape or model_input_shape[1] is None:
@@ -171,16 +171,14 @@ class FawkesMaskGeneration:
 
             self.bottleneck_a = bottleneck_model(cur_aimg_input)
             if self.MIMIC_IMG:
-                # cur_timg_input = resize_tensor(self.timg_input, model_input_shape)
-                # cur_simg_input = resize_tensor(self.simg_input, model_input_shape)
                 cur_timg_input = self.timg_input
                 cur_simg_input = self.simg_input
                 self.bottleneck_t = calculate_direction(bottleneck_model, cur_timg_input, cur_simg_input)
-                # self.bottleneck_t = bottleneck_model(cur_timg_input)
             else:
                 self.bottleneck_t = self.bottleneck_t_raw
 
             bottleneck_diff = self.bottleneck_t - self.bottleneck_a
+
             scale_factor = tf.sqrt(tf.reduce_sum(tf.square(self.bottleneck_t), axis=1))
 
             cur_bottlesim = tf.sqrt(tf.reduce_sum(tf.square(bottleneck_diff), axis=1))
@@ -189,7 +187,6 @@ class FawkesMaskGeneration:
 
             self.bottlesim += cur_bottlesim
 
-            # self.bottlesim_push += cur_bottlesim_push_sum
             self.bottlesim_sum += cur_bottlesim_sum
 
         # sum up the losses
@@ -202,20 +199,13 @@ class FawkesMaskGeneration:
                                                self.loss,
                                                tf.zeros_like(self.loss)))
 
-        # self.loss_sum = self.dist_sum + tf.reduce_sum(self.bottlesim)
-        # import pdb
-        # pdb.set_trace()
-        # self.loss_sum = tf.reduce_sum(tf.where(self.mask, self.loss, tf.zeros_like(self.loss)))
-
-        # Setup the Adadelta optimizer and keep track of variables
-        # we're creating
         start_vars = set(x.name for x in tf.global_variables())
         self.learning_rate_holder = tf.placeholder(tf.float32, shape=[])
+
         optimizer = tf.train.AdadeltaOptimizer(self.learning_rate_holder)
         # optimizer = tf.train.AdamOptimizer(self.learning_rate_holder)
 
-        self.train = optimizer.minimize(self.loss_sum,
-                                        var_list=[self.modifier])
+        self.train = optimizer.minimize(self.loss_sum, var_list=[self.modifier])
         end_vars = tf.global_variables()
         new_vars = [x for x in end_vars if x.name not in start_vars]
 
@@ -297,6 +287,7 @@ class FawkesMaskGeneration:
         LR = self.learning_rate
         nb_imgs = source_imgs.shape[0]
         mask = [True] * nb_imgs + [False] * (self.batch_size - nb_imgs)
+        # mask = [True] * self.batch_size
         mask = np.array(mask, dtype=np.bool)
 
         source_imgs = np.array(source_imgs)
@@ -317,19 +308,34 @@ class FawkesMaskGeneration:
             timg_tanh_batch = np.zeros(self.input_shape)
         else:
             timg_tanh_batch = np.zeros(self.bottleneck_shape)
+
         weights_batch = np.zeros(self.bottleneck_shape)
         simg_tanh_batch[:nb_imgs] = simg_tanh[:nb_imgs]
         timg_tanh_batch[:nb_imgs] = timg_tanh[:nb_imgs]
         weights_batch[:nb_imgs] = weights[:nb_imgs]
         modifier_batch = np.ones(self.input_shape) * 1e-6
 
-        self.sess.run(self.setup,
-                      {self.assign_timg_tanh: timg_tanh_batch,
-                       self.assign_simg_tanh: simg_tanh_batch,
-                       self.assign_const: CONST,
-                       self.assign_mask: mask,
-                       self.assign_weights: weights_batch,
-                       self.assign_modifier: modifier_batch})
+        temp_images = []
+
+        # set the variables so that we don't have to send them over again
+        if self.MIMIC_IMG:
+            self.sess.run(self.setup,
+                          {self.assign_timg_tanh: timg_tanh_batch,
+                           self.assign_simg_tanh: simg_tanh_batch,
+                           self.assign_const: CONST,
+                           self.assign_mask: mask,
+                           self.assign_weights: weights_batch,
+                           self.assign_modifier: modifier_batch})
+        else:
+            # if directly mimicking a vector, use assign_bottleneck_t_raw
+            # in setup
+            self.sess.run(self.setup,
+                          {self.assign_bottleneck_t_raw: timg_tanh_batch,
+                           self.assign_simg_tanh: simg_tanh_batch,
+                           self.assign_const: CONST,
+                           self.assign_mask: mask,
+                           self.assign_weights: weights_batch,
+                           self.assign_modifier: modifier_batch})
 
         best_bottlesim = [0] * nb_imgs if self.maximize else [np.inf] * nb_imgs
         best_adv = np.zeros_like(source_imgs)
@@ -347,6 +353,7 @@ class FawkesMaskGeneration:
                      dist_raw_sum,
                      bottlesim_sum / nb_imgs))
 
+        finished_idx = set()
         try:
             total_distance = [0] * nb_imgs
 
@@ -369,8 +376,14 @@ class FawkesMaskGeneration:
                     [self.dist_raw,
                      self.bottlesim,
                      self.aimg_input])
+
+                all_clear = True
                 for e, (dist_raw, bottlesim, aimg_input) in enumerate(
                         zip(dist_raw_list, bottlesim_list, aimg_input_list)):
+
+                    if e in finished_idx:
+                        continue
+
                     if e >= nb_imgs:
                         break
                     if (bottlesim < best_bottlesim[e] and bottlesim > total_distance[e] * 0.1 and (
@@ -379,40 +392,55 @@ class FawkesMaskGeneration:
                         best_bottlesim[e] = bottlesim
                         best_adv[e] = aimg_input
 
-                if iteration != 0 and iteration % (self.MAX_ITERATIONS // 3) == 0:
-                    # LR = LR / 2
+                    # if iteration > 20 and (dist_raw >= self.l_threshold or iteration == self.MAX_ITERATIONS - 1):
+                    #     finished_idx.add(e)
+                    #     print("{} finished at dist {}".format(e, dist_raw))
+                    #     best_bottlesim[e] = bottlesim
+                    #     best_adv[e] = aimg_input
+                    #
+                    all_clear = False
+
+                if all_clear:
+                    break
+
+                if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
+                    LR = LR / 2
                     print("Learning Rate: ", LR)
 
-                if iteration % (self.MAX_ITERATIONS // 10) == 0:
+                if iteration % (self.MAX_ITERATIONS // 5) == 0:
                     if self.verbose == 1:
-                        loss_sum = float(self.sess.run(self.loss_sum))
-                        dist_sum = float(self.sess.run(self.dist_sum))
-                        thresh_over = (dist_sum /
-                                       self.batch_size /
-                                       self.l_threshold *
-                                       100)
                         dist_raw_sum = float(self.sess.run(self.dist_raw_sum))
                         bottlesim_sum = self.sess.run(self.bottlesim_sum)
-                        print('ITER %4d: Total loss: %.4E; perturb: %.6f (%.2f%% over, raw: %.6f); sim: %f'
-                              % (iteration,
-                                 Decimal(loss_sum),
-                                 dist_sum,
-                                 thresh_over,
-                                 dist_raw_sum,
-                                 bottlesim_sum / nb_imgs))
+                        print('ITER %4d perturb: %.5f; sim: %f'
+                              % (iteration, dist_raw_sum / nb_imgs, bottlesim_sum / nb_imgs))
+
+                        # protected_images = aimg_input_list
+                        #
+                        # orginal_images = np.copy(self.faces.cropped_faces)
+                        # cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(
+                        #     orginal_images)
+                        # final_images = self.faces.merge_faces(cloak_perturbation)
+                        #
+                        # for p_img, img in zip(protected_images, final_images):
+                        #     dump_image(reverse_process_cloaked(p_img),
+                        #                "/home/shansixioing/fawkes/data/emily/emily_cloaked_cropped{}.png".format(iteration),
+                        #                format='png')
+                        #
+                        #     dump_image(img,
+                        #                "/home/shansixioing/fawkes/data/emily/emily_cloaked_{}.png".format(iteration),
+                        #                format='png')
+
         except KeyboardInterrupt:
             pass
 
         if self.verbose == 1:
             loss_sum = float(self.sess.run(self.loss_sum))
             dist_sum = float(self.sess.run(self.dist_sum))
-            thresh_over = (dist_sum / self.batch_size / self.l_threshold * 100)
             dist_raw_sum = float(self.sess.run(self.dist_raw_sum))
             bottlesim_sum = float(self.sess.run(self.bottlesim_sum))
-            print('END:       Total loss: %.4E; perturb: %.6f (%.2f%% over, raw: %.6f); sim: %f'
+            print('END:       Total loss: %.4E; perturb: %.6f (raw: %.6f); sim: %f'
                   % (Decimal(loss_sum),
                      dist_sum,
-                     thresh_over,
                      dist_raw_sum,
                      bottlesim_sum / nb_imgs))
 
