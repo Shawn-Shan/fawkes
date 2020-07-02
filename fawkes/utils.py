@@ -4,21 +4,26 @@ import json
 import os
 import pickle
 import random
+import sys
 
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 import keras
+
+sys.stderr = stderr
 import keras.backend as K
 import numpy as np
 import tensorflow as tf
-from align_face import align, aligner
-from keras.applications.vgg16 import preprocess_input
+from PIL import Image, ExifTags
+# from keras.applications.vgg16 import preprocess_input
 from keras.layers import Dense, Activation
 from keras.models import Model
 from keras.preprocessing import image
 from keras.utils import get_file
-from keras.utils import to_categorical
 from skimage.transform import resize
 from sklearn.metrics import pairwise_distances
-from PIL import Image, ExifTags
+
+from .align_face import align, aligner
 
 
 def clip_img(X, preprocessing='raw'):
@@ -81,7 +86,14 @@ class Faces(object):
             self.cropped_index.extend(cur_index)
             self.callback_idx.extend([i] * len(cur_faces_square))
 
-        self.cropped_faces = preprocess_input(np.array(self.cropped_faces))
+        if not self.cropped_faces:
+            print("No faces detected")
+            exit(1)
+
+        self.cropped_faces = np.array(self.cropped_faces)
+
+        self.cropped_faces = preprocess(self.cropped_faces, 'imagenet')
+
         self.cloaked_cropped_faces = None
         self.cloaked_faces = np.copy(self.org_faces)
 
@@ -89,8 +101,6 @@ class Faces(object):
         return self.cropped_faces
 
     def merge_faces(self, cloaks):
-        # import pdb
-        # pdb.set_trace()
 
         self.cloaked_faces = np.copy(self.org_faces)
 
@@ -300,7 +310,6 @@ def load_extractor(name):
     return model
 
 
-
 def get_dataset_path(dataset):
     model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
     if not os.path.exists(os.path.join(model_dir, "config.json")):
@@ -335,7 +344,7 @@ def load_dir(path):
         im = image.img_to_array(im)
         x_ls.append(im)
     raw_x = np.array(x_ls)
-    return preprocess_input(raw_x)
+    return preprocess(raw_x, 'imagenet')
 
 
 def load_embeddings(feature_extractors_names):
@@ -394,10 +403,19 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     max_sum = np.min(pair_dist, axis=0)
     max_id = np.argmax(max_sum)
 
-    image_paths = glob.glob(os.path.join(model_dir, "target_data/{}/*".format(paths[int(max_id)])))
+    target_data_id = paths[int(max_id)]
+    image_dir = os.path.join(model_dir, "target_data/{}/*".format(target_data_id))
+    if not os.path.exists(image_dir):
+        get_file("{}.h5".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/target_images".format(name),
+                 cache_dir=model_dir, cache_subdir='')
+
+    image_paths = glob.glob(image_dir)
+
     target_images = [image.img_to_array(image.load_img(cur_path)) for cur_path in
                      image_paths]
-    target_images = preprocess_input(np.array([resize(x, (224, 224)) for x in target_images]))
+
+    target_images = np.array([resize(x, (224, 224)) for x in target_images])
+    target_images = preprocess(target_images, 'imagenet')
 
     target_images = list(target_images)
     while len(target_images) < len(imgs):
@@ -406,152 +424,151 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     target_images = random.sample(target_images, len(imgs))
     return np.array(target_images)
 
-
-class CloakData(object):
-    def __init__(self, protect_directory=None, img_shape=(224, 224)):
-
-        self.img_shape = img_shape
-        # self.train_data_dir, self.test_data_dir, self.number_classes, self.number_samples = get_dataset_path(dataset)
-        # self.all_labels = sorted(list(os.listdir(self.train_data_dir)))
-        self.protect_directory = protect_directory
-
-        self.protect_X = self.load_label_data(self.protect_directory)
-
-        self.cloaked_protect_train_X = None
-
-        self.label2path_train, self.label2path_test, self.path2idx = self.build_data_mapping()
-        self.all_training_path = self.get_all_data_path(self.label2path_train)
-        self.all_test_path = self.get_all_data_path(self.label2path_test)
-        self.protect_class_path = self.get_class_image_files(os.path.join(self.train_data_dir, self.protect_class))
-
-    def get_class_image_files(self, path):
-        return [os.path.join(path, f) for f in os.listdir(path)]
-
-    def extractor_ls_predict(self, feature_extractors_ls, X):
-        feature_ls = []
-        for extractor in feature_extractors_ls:
-            cur_features = extractor.predict(X)
-            feature_ls.append(cur_features)
-        concated_feature_ls = np.concatenate(feature_ls, axis=1)
-        concated_feature_ls = normalize(concated_feature_ls)
-        return concated_feature_ls
-
-    def load_embeddings(self, feature_extractors_names):
-        dictionaries = []
-        for extractor_name in feature_extractors_names:
-            path2emb = pickle.load(open("../feature_extractors/embeddings/{}_emb_norm.p".format(extractor_name), "rb"))
-            dictionaries.append(path2emb)
-
-        merge_dict = {}
-        for k in dictionaries[0].keys():
-            cur_emb = [dic[k] for dic in dictionaries]
-            merge_dict[k] = np.concatenate(cur_emb)
-        return merge_dict
-
-    def select_target_label(self, feature_extractors_ls, feature_extractors_names, metric='l2'):
-        original_feature_x = self.extractor_ls_predict(feature_extractors_ls, self.protect_train_X)
-
-        path2emb = self.load_embeddings(feature_extractors_names)
-        items = list(path2emb.items())
-        paths = [p[0] for p in items]
-        embs = [p[1] for p in items]
-        embs = np.array(embs)
-
-        pair_dist = pairwise_distances(original_feature_x, embs, metric)
-        max_sum = np.min(pair_dist, axis=0)
-        sorted_idx = np.argsort(max_sum)[::-1]
-
-        highest_num = 0
-        paired_target_X = None
-        final_target_class_path = None
-        for idx in sorted_idx[:5]:
-            target_class_path = paths[idx]
-            cur_target_X = self.load_dir(target_class_path)
-            cur_target_X = np.concatenate([cur_target_X, cur_target_X, cur_target_X])
-            cur_tot_sum, cur_paired_target_X = self.calculate_dist_score(self.protect_train_X, cur_target_X,
-                                                                         feature_extractors_ls,
-                                                                         metric=metric)
-            if cur_tot_sum > highest_num:
-                highest_num = cur_tot_sum
-                paired_target_X = cur_paired_target_X
-                final_target_class_path = target_class_path
-
-        np.random.shuffle(paired_target_X)
-        return final_target_class_path, paired_target_X
-
-    def calculate_dist_score(self, a, b, feature_extractors_ls, metric='l2'):
-        features1 = self.extractor_ls_predict(feature_extractors_ls, a)
-        features2 = self.extractor_ls_predict(feature_extractors_ls, b)
-
-        pair_cos = pairwise_distances(features1, features2, metric)
-        max_sum = np.min(pair_cos, axis=0)
-        max_sum_arg = np.argsort(max_sum)[::-1]
-        max_sum_arg = max_sum_arg[:len(a)]
-        max_sum = [max_sum[i] for i in max_sum_arg]
-        paired_target_X = [b[j] for j in max_sum_arg]
-        paired_target_X = np.array(paired_target_X)
-        return np.min(max_sum), paired_target_X
-
-    def get_all_data_path(self, label2path):
-        all_paths = []
-        for k, v in label2path.items():
-            cur_all_paths = [os.path.join(k, cur_p) for cur_p in v]
-            all_paths.extend(cur_all_paths)
-        return all_paths
-
-    def load_label_data(self, label):
-        train_label_path = os.path.join(self.train_data_dir, label)
-        test_label_path = os.path.join(self.test_data_dir, label)
-        train_X = self.load_dir(train_label_path)
-        test_X = self.load_dir(test_label_path)
-        return train_X, test_X
-
-    def load_dir(self, path):
-        assert os.path.exists(path)
-        x_ls = []
-        for file in os.listdir(path):
-            cur_path = os.path.join(path, file)
-            im = image.load_img(cur_path, target_size=self.img_shape)
-            im = image.img_to_array(im)
-            x_ls.append(im)
-        raw_x = np.array(x_ls)
-        return preprocess_input(raw_x)
-
-    def build_data_mapping(self):
-        label2path_train = {}
-        label2path_test = {}
-        idx = 0
-        path2idx = {}
-        for label_name in self.all_labels:
-            full_path_train = os.path.join(self.train_data_dir, label_name)
-            full_path_test = os.path.join(self.test_data_dir, label_name)
-            label2path_train[full_path_train] = list(os.listdir(full_path_train))
-            label2path_test[full_path_test] = list(os.listdir(full_path_test))
-            for img_file in os.listdir(full_path_train):
-                path2idx[os.path.join(full_path_train, img_file)] = idx
-            for img_file in os.listdir(full_path_test):
-                path2idx[os.path.join(full_path_test, img_file)] = idx
-            idx += 1
-        return label2path_train, label2path_test, path2idx
-
-    def generate_data_post_cloak(self, sybil=False):
-        assert self.cloaked_protect_train_X is not None
-        while True:
-            batch_X = []
-            batch_Y = []
-            cur_batch_path = random.sample(self.all_training_path, 32)
-            for p in cur_batch_path:
-                cur_y = self.path2idx[p]
-                if p in self.protect_class_path:
-                    cur_x = random.choice(self.cloaked_protect_train_X)
-                elif sybil and (p in self.sybil_class):
-                    cur_x = random.choice(self.cloaked_sybil_train_X)
-                else:
-                    im = image.load_img(p, target_size=self.img_shape)
-                    im = image.img_to_array(im)
-                    cur_x = preprocess_input(im)
-                batch_X.append(cur_x)
-                batch_Y.append(cur_y)
-            batch_X = np.array(batch_X)
-            batch_Y = to_categorical(np.array(batch_Y), num_classes=self.number_classes)
-            yield batch_X, batch_Y
+# class CloakData(object):
+#     def __init__(self, protect_directory=None, img_shape=(224, 224)):
+#
+#         self.img_shape = img_shape
+#         # self.train_data_dir, self.test_data_dir, self.number_classes, self.number_samples = get_dataset_path(dataset)
+#         # self.all_labels = sorted(list(os.listdir(self.train_data_dir)))
+#         self.protect_directory = protect_directory
+#
+#         self.protect_X = self.load_label_data(self.protect_directory)
+#
+#         self.cloaked_protect_train_X = None
+#
+#         self.label2path_train, self.label2path_test, self.path2idx = self.build_data_mapping()
+#         self.all_training_path = self.get_all_data_path(self.label2path_train)
+#         self.all_test_path = self.get_all_data_path(self.label2path_test)
+#         self.protect_class_path = self.get_class_image_files(os.path.join(self.train_data_dir, self.protect_class))
+#
+#     def get_class_image_files(self, path):
+#         return [os.path.join(path, f) for f in os.listdir(path)]
+#
+#     def extractor_ls_predict(self, feature_extractors_ls, X):
+#         feature_ls = []
+#         for extractor in feature_extractors_ls:
+#             cur_features = extractor.predict(X)
+#             feature_ls.append(cur_features)
+#         concated_feature_ls = np.concatenate(feature_ls, axis=1)
+#         concated_feature_ls = normalize(concated_feature_ls)
+#         return concated_feature_ls
+#
+#     def load_embeddings(self, feature_extractors_names):
+#         dictionaries = []
+#         for extractor_name in feature_extractors_names:
+#             path2emb = pickle.load(open("../feature_extractors/embeddings/{}_emb_norm.p".format(extractor_name), "rb"))
+#             dictionaries.append(path2emb)
+#
+#         merge_dict = {}
+#         for k in dictionaries[0].keys():
+#             cur_emb = [dic[k] for dic in dictionaries]
+#             merge_dict[k] = np.concatenate(cur_emb)
+#         return merge_dict
+#
+#     def select_target_label(self, feature_extractors_ls, feature_extractors_names, metric='l2'):
+#         original_feature_x = self.extractor_ls_predict(feature_extractors_ls, self.protect_train_X)
+#
+#         path2emb = self.load_embeddings(feature_extractors_names)
+#         items = list(path2emb.items())
+#         paths = [p[0] for p in items]
+#         embs = [p[1] for p in items]
+#         embs = np.array(embs)
+#
+#         pair_dist = pairwise_distances(original_feature_x, embs, metric)
+#         max_sum = np.min(pair_dist, axis=0)
+#         sorted_idx = np.argsort(max_sum)[::-1]
+#
+#         highest_num = 0
+#         paired_target_X = None
+#         final_target_class_path = None
+#         for idx in sorted_idx[:5]:
+#             target_class_path = paths[idx]
+#             cur_target_X = self.load_dir(target_class_path)
+#             cur_target_X = np.concatenate([cur_target_X, cur_target_X, cur_target_X])
+#             cur_tot_sum, cur_paired_target_X = self.calculate_dist_score(self.protect_train_X, cur_target_X,
+#                                                                          feature_extractors_ls,
+#                                                                          metric=metric)
+#             if cur_tot_sum > highest_num:
+#                 highest_num = cur_tot_sum
+#                 paired_target_X = cur_paired_target_X
+#                 final_target_class_path = target_class_path
+#
+#         np.random.shuffle(paired_target_X)
+#         return final_target_class_path, paired_target_X
+#
+#     def calculate_dist_score(self, a, b, feature_extractors_ls, metric='l2'):
+#         features1 = self.extractor_ls_predict(feature_extractors_ls, a)
+#         features2 = self.extractor_ls_predict(feature_extractors_ls, b)
+#
+#         pair_cos = pairwise_distances(features1, features2, metric)
+#         max_sum = np.min(pair_cos, axis=0)
+#         max_sum_arg = np.argsort(max_sum)[::-1]
+#         max_sum_arg = max_sum_arg[:len(a)]
+#         max_sum = [max_sum[i] for i in max_sum_arg]
+#         paired_target_X = [b[j] for j in max_sum_arg]
+#         paired_target_X = np.array(paired_target_X)
+#         return np.min(max_sum), paired_target_X
+#
+#     def get_all_data_path(self, label2path):
+#         all_paths = []
+#         for k, v in label2path.items():
+#             cur_all_paths = [os.path.join(k, cur_p) for cur_p in v]
+#             all_paths.extend(cur_all_paths)
+#         return all_paths
+#
+#     def load_label_data(self, label):
+#         train_label_path = os.path.join(self.train_data_dir, label)
+#         test_label_path = os.path.join(self.test_data_dir, label)
+#         train_X = self.load_dir(train_label_path)
+#         test_X = self.load_dir(test_label_path)
+#         return train_X, test_X
+#
+#     def load_dir(self, path):
+#         assert os.path.exists(path)
+#         x_ls = []
+#         for file in os.listdir(path):
+#             cur_path = os.path.join(path, file)
+#             im = image.load_img(cur_path, target_size=self.img_shape)
+#             im = image.img_to_array(im)
+#             x_ls.append(im)
+#         raw_x = np.array(x_ls)
+#         return preprocess_input(raw_x)
+#
+#     def build_data_mapping(self):
+#         label2path_train = {}
+#         label2path_test = {}
+#         idx = 0
+#         path2idx = {}
+#         for label_name in self.all_labels:
+#             full_path_train = os.path.join(self.train_data_dir, label_name)
+#             full_path_test = os.path.join(self.test_data_dir, label_name)
+#             label2path_train[full_path_train] = list(os.listdir(full_path_train))
+#             label2path_test[full_path_test] = list(os.listdir(full_path_test))
+#             for img_file in os.listdir(full_path_train):
+#                 path2idx[os.path.join(full_path_train, img_file)] = idx
+#             for img_file in os.listdir(full_path_test):
+#                 path2idx[os.path.join(full_path_test, img_file)] = idx
+#             idx += 1
+#         return label2path_train, label2path_test, path2idx
+#
+#     def generate_data_post_cloak(self, sybil=False):
+#         assert self.cloaked_protect_train_X is not None
+#         while True:
+#             batch_X = []
+#             batch_Y = []
+#             cur_batch_path = random.sample(self.all_training_path, 32)
+#             for p in cur_batch_path:
+#                 cur_y = self.path2idx[p]
+#                 if p in self.protect_class_path:
+#                     cur_x = random.choice(self.cloaked_protect_train_X)
+#                 elif sybil and (p in self.sybil_class):
+#                     cur_x = random.choice(self.cloaked_sybil_train_X)
+#                 else:
+#                     im = image.load_img(p, target_size=self.img_shape)
+#                     im = image.img_to_array(im)
+#                     cur_x = preprocess_input(im)
+#                 batch_X.append(cur_x)
+#                 batch_Y.append(cur_y)
+#             batch_X = np.array(batch_X)
+#             batch_Y = to_categorical(np.array(batch_Y), num_classes=self.number_classes)
+#             yield batch_X, batch_Y

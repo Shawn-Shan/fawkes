@@ -1,6 +1,5 @@
-import detect_face
+from .detect_face import detect_face, create_mtcnn
 import numpy as np
-import tensorflow as tf
 
 # modify the default parameters of np.load
 np_load_old = np.load
@@ -15,7 +14,7 @@ def to_rgb(img):
 
 
 def aligner(sess):
-    pnet, rnet, onet = detect_face.create_mtcnn(sess, None)
+    pnet, rnet, onet = create_mtcnn(sess, None)
     return [pnet, rnet, onet]
 
 
@@ -31,7 +30,7 @@ def align(orig_img, aligner, margin=0.8, detect_multiple_faces=True):
         orig_img = to_rgb(orig_img)
     orig_img = orig_img[:, :, 0:3]
 
-    bounding_boxes, _ = detect_face.detect_face(orig_img, minsize, pnet, rnet, onet, threshold, factor)
+    bounding_boxes, _ = detect_face(orig_img, minsize, pnet, rnet, onet, threshold, factor)
     nrof_faces = bounding_boxes.shape[0]
     if nrof_faces > 0:
         det = bounding_boxes[:, 0:4]
