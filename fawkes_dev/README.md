@@ -52,6 +52,7 @@ We shared three different feature extractors under feature_extractors/
 1. low_extract.h5: trained on WebFace dataset with DenseNet architecture. 
 2. mid_extract.h5: VGGFace2 dataset with DenseNet architecture. Trained with PGD adversarial training for 5 epochs. 
 3. high_extract.h5: WebFace dataset with DenseNet architecture. Trained with PGD adversarial training for 20 epochs. 
+4. high2_extract.h5: VGGFace2 dataset with DenseNet architecture. Trained with PGD adversarial training for 20 epochs. 
 
 ### Citation
 ```
