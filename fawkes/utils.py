@@ -1,3 +1,5 @@
+import glob
+import gzip
 import json
 import os
 import pickle
@@ -7,12 +9,16 @@ import keras
 import keras.backend as K
 import numpy as np
 import tensorflow as tf
+from align_face import align, aligner
 from keras.applications.vgg16 import preprocess_input
 from keras.layers import Dense, Activation
 from keras.models import Model
 from keras.preprocessing import image
+from keras.utils import get_file
 from keras.utils import to_categorical
+from skimage.transform import resize
 from sklearn.metrics import pairwise_distances
+from PIL import Image, ExifTags
 
 
 def clip_img(X, preprocessing='raw'):
@@ -20,6 +26,86 @@ def clip_img(X, preprocessing='raw'):
     X = np.clip(X, 0.0, 255.0)
     X = preprocess(X, preprocessing)
     return X
+
+
+def load_image(path):
+    img = Image.open(path)
+    if img._getexif() is not None:
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+
+        exif = dict(img._getexif().items())
+        if orientation in exif.keys():
+            if exif[orientation] == 3:
+                img = img.rotate(180, expand=True)
+            elif exif[orientation] == 6:
+                img = img.rotate(270, expand=True)
+            elif exif[orientation] == 8:
+                img = img.rotate(90, expand=True)
+            else:
+                pass
+    img = img.convert('RGB')
+    image_array = image.img_to_array(img)
+
+    return image_array
+
+
+class Faces(object):
+    def __init__(self, image_paths, sess):
+        self.aligner = aligner(sess)
+        self.org_faces = []
+        self.cropped_faces = []
+        self.cropped_faces_shape = []
+        self.cropped_index = []
+        self.callback_idx = []
+        for i, p in enumerate(image_paths):
+            cur_img = load_image(p)
+            self.org_faces.append(cur_img)
+            align_img = align(cur_img, self.aligner, margin=0.7)
+            cur_faces = align_img[0]
+
+            cur_shapes = [f.shape[:-1] for f in cur_faces]
+
+            cur_faces_square = []
+            for img in cur_faces:
+                long_size = max([img.shape[1], img.shape[0]])
+                base = np.zeros((long_size, long_size, 3))
+                base[0:img.shape[0], 0:img.shape[1], :] = img
+                cur_faces_square.append(base)
+
+            cur_index = align_img[1]
+            cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]
+            self.cropped_faces_shape.extend(cur_shapes)
+            self.cropped_faces.extend(cur_faces_square)
+            self.cropped_index.extend(cur_index)
+            self.callback_idx.extend([i] * len(cur_faces_square))
+
+        self.cropped_faces = preprocess_input(np.array(self.cropped_faces))
+        self.cloaked_cropped_faces = None
+        self.cloaked_faces = np.copy(self.org_faces)
+
+    def get_faces(self):
+        return self.cropped_faces
+
+    def merge_faces(self, cloaks):
+        # import pdb
+        # pdb.set_trace()
+
+        self.cloaked_faces = np.copy(self.org_faces)
+
+        for i in range(len(self.cropped_faces)):
+            cur_cloak = cloaks[i]
+            org_shape = self.cropped_faces_shape[i]
+            old_square_shape = max([org_shape[0], org_shape[1]])
+            reshape_cloak = resize(cur_cloak, (old_square_shape, old_square_shape))
+            reshape_cloak = reshape_cloak[0:org_shape[0], 0:org_shape[1], :]
+
+            callback_id = self.callback_idx[i]
+            bb = self.cropped_index[i]
+            self.cloaked_faces[callback_id][bb[1]:bb[3], bb[0]:bb[2], :] += reshape_cloak
+
+        return self.cloaked_faces
 
 
 def dump_dictionary_as_json(dict, outfile):
@@ -30,10 +116,12 @@ def dump_dictionary_as_json(dict, outfile):
 
 def fix_gpu_memory(mem_fraction=1):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=mem_fraction)
-    tf_config = tf.ConfigProto(gpu_options=gpu_options)
-    tf_config.gpu_options.allow_growth = True
-    tf_config.log_device_placement = False
+    tf_config = None
+    if tf.test.is_gpu_available():
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=mem_fraction)
+        tf_config = tf.ConfigProto(gpu_options=gpu_options)
+        tf_config.gpu_options.allow_growth = True
+        tf_config.log_device_placement = False
     init_op = tf.global_variables_initializer()
     sess = tf.Session(config=tf_config)
     sess.run(init_op)
@@ -45,7 +133,6 @@ def load_victim_model(number_classes, teacher_model=None, end2end=False):
     for l in teacher_model.layers:
         l.trainable = end2end
     x = teacher_model.layers[-1].output
-
     x = Dense(number_classes)(x)
     x = Activation('softmax', name="act")(x)
     model = Model(teacher_model.input, x)
@@ -141,6 +228,7 @@ def imagenet_preprocessing(x, data_format=None):
 
     return x
 
+
 def imagenet_reverse_preprocessing(x, data_format=None):
     import keras.backend as K
     x = np.array(x)
@@ -185,7 +273,20 @@ def build_bottleneck_model(model, cut_off):
 
 
 def load_extractor(name):
-    model = keras.models.load_model("../feature_extractors/{}.h5".format(name))
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+    os.makedirs(model_dir, exist_ok=True)
+    model_file = os.path.join(model_dir, "{}.h5".format(name))
+    if os.path.exists(model_file):
+        model = keras.models.load_model(model_file)
+    else:
+        get_file("{}.h5".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
+                 cache_dir=model_dir, cache_subdir='')
+
+        get_file("{}_emb.p.gz".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}_emb.p.gz".format(name),
+                 cache_dir=model_dir, cache_subdir='')
+
+        model = keras.models.load_model(model_file)
+
     if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
         raise Exception(
             "Given extractor's last layer is softmax, need to remove the top layers to make it into a feature extractor")
@@ -199,11 +300,13 @@ def load_extractor(name):
     return model
 
 
+
 def get_dataset_path(dataset):
-    if not os.path.exists("config.json"):
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+    if not os.path.exists(os.path.join(model_dir, "config.json")):
         raise Exception("Please config the datasets before running protection code. See more in README and config.py.")
 
-    config = json.load(open("config.json", 'r'))
+    config = json.load(open(os.path.join(model_dir, "config.json"), 'r'))
     if dataset not in config:
         raise Exception(
             "Dataset {} does not exist, please download to data/ and add the path to this function... Abort".format(
@@ -217,7 +320,8 @@ def normalize(x):
 
 
 def dump_image(x, filename, format="png", scale=False):
-    img = image.array_to_img(x, scale=scale)
+    # img = image.array_to_img(x, scale=scale)
+    img = image.array_to_img(x)
     img.save(filename, format)
     return
 
@@ -235,9 +339,13 @@ def load_dir(path):
 
 
 def load_embeddings(feature_extractors_names):
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
     dictionaries = []
     for extractor_name in feature_extractors_names:
-        path2emb = pickle.load(open("../feature_extractors/embeddings/{}_emb_norm.p".format(extractor_name), "rb"))
+        fp = gzip.open(os.path.join(model_dir, "{}_emb.p.gz".format(extractor_name)), 'rb')
+        path2emb = pickle.load(fp)
+        fp.close()
+
         dictionaries.append(path2emb)
 
     merge_dict = {}
@@ -272,6 +380,8 @@ def calculate_dist_score(a, b, feature_extractors_ls, metric='l2'):
 
 
 def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, metric='l2'):
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+
     original_feature_x = extractor_ls_predict(feature_extractors_ls, imgs)
 
     path2emb = load_embeddings(feature_extractors_names)
@@ -282,37 +392,25 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
 
     pair_dist = pairwise_distances(original_feature_x, embs, metric)
     max_sum = np.min(pair_dist, axis=0)
-    sorted_idx = np.argsort(max_sum)[::-1]
+    max_id = np.argmax(max_sum)
 
-    highest_num = 0
-    paired_target_X = None
-    final_target_class_path = None
-    for idx in sorted_idx[:1]:
-        target_class_path = paths[idx]
-        cur_target_X = load_dir(target_class_path)
-        cur_target_X = np.concatenate([cur_target_X, cur_target_X, cur_target_X])
-        cur_tot_sum, cur_paired_target_X = calculate_dist_score(imgs, cur_target_X,
-                                                                feature_extractors_ls,
-                                                                metric=metric)
-        if cur_tot_sum > highest_num:
-            highest_num = cur_tot_sum
-            paired_target_X = cur_paired_target_X
+    image_paths = glob.glob(os.path.join(model_dir, "target_data/{}/*".format(paths[int(max_id)])))
+    target_images = [image.img_to_array(image.load_img(cur_path)) for cur_path in
+                     image_paths]
+    target_images = preprocess_input(np.array([resize(x, (224, 224)) for x in target_images]))
 
-    np.random.shuffle(paired_target_X)
-    paired_target_X = list(paired_target_X)
-    while len(paired_target_X) < len(imgs):
-        paired_target_X += paired_target_X
+    target_images = list(target_images)
+    while len(target_images) < len(imgs):
+        target_images += target_images
 
-    paired_target_X = paired_target_X[:len(imgs)]
-    return np.array(paired_target_X)
-
+    target_images = random.sample(target_images, len(imgs))
+    return np.array(target_images)
 
 
 class CloakData(object):
     def __init__(self, protect_directory=None, img_shape=(224, 224)):
 
         self.img_shape = img_shape
-
         # self.train_data_dir, self.test_data_dir, self.number_classes, self.number_samples = get_dataset_path(dataset)
         # self.all_labels = sorted(list(os.listdir(self.train_data_dir)))
         self.protect_directory = protect_directory

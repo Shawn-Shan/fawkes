@@ -4,7 +4,7 @@ import os
 
 DATASETS = {
     "pubfig": "../data/pubfig",
-    "scrub": "/home/shansixioing/cloak/fawkes/data/scrub/",
+    "scrub": "/home/shansixioing/fawkes/data/scrub/",
     "vggface2": "/mnt/data/sixiongshan/data/vggface2/",
     "webface": "/mnt/data/sixiongshan/data/webface/",
     "youtubeface": "/mnt/data/sixiongshan/data/youtubeface/keras_flow_data/",
@@ -32,7 +32,8 @@ def main():
                            "num_images": num_images}
         print("Successfully config {}".format(dataset))
     j = json.dumps(config)
-    with open("config.json", "wb") as f:
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+    with open(os.path.join(model_dir, "config.json"), "wb") as f:
         f.write(j.encode())
 
 
