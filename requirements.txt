@@ -1,0 +1,4 @@
+scikit-image
+argparse
+glob
+numpy==1.18.4
