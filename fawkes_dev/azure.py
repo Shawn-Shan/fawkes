@@ -1,14 +1,28 @@
-
-import http.client, urllib.request, urllib.parse, urllib.error
+import http.client
 import json
+import random
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
-#Face API Key and Endpoint
-subscription_key = 'e127e26e4d534e2bad6fd9ca06145302'
-uri_base = 'eastus.api.cognitive.microsoft.com'
-# uri_base = 'https://shawn.cognitiveservices.azure.com/'
+import requests
+
+# Face API Key and Endpoint
+f = open('api_key.txt', 'r')
+data = f.read().split("\n")
+subscription_key = data[0]
+uri_base = data[1]
+
+cloak_image_base = 'http://sandlab.cs.uchicago.edu/fawkes/files/cloak/{}_ultra_cloaked.png'
+original_image_base = 'http://sandlab.cs.uchicago.edu/fawkes/files/cloak/{}.png'
+
 
 def detect_face(image_url):
+    r = requests.get(image_url)
+    if r.status_code != 200:
+        return None
+
     headers = {
         # Request headers
         'Content-Type': 'application/json',
@@ -32,6 +46,7 @@ def detect_face(image_url):
     conn.request("POST", "/face/v1.0/detect?%s" % params, body, headers)
     response = conn.getresponse()
     data = json.loads(response.read())
+    print(data)
     conn.close()
     return data[0]["faceId"]
 
@@ -102,12 +117,16 @@ def create_personId(personGroupId, personName):
     conn.request("POST", "/face/v1.0/persongroups/{}/persons?%s".format(personGroupId) % params, body, headers)
     response = conn.getresponse()
     data = json.loads(response.read())
-    print(data)
+    # print(data)
     conn.close()
     return data["personId"]
 
 
 def add_persistedFaceId(personGroupId, personId, image_url):
+    r = requests.get(image_url)
+    if r.status_code != 200:
+        return None
+
     headers = {
         'Content-Type': 'application/json',
         'Ocp-Apim-Subscription-Key': subscription_key,
@@ -123,11 +142,14 @@ def add_persistedFaceId(personGroupId, personId, image_url):
     })
 
     conn = http.client.HTTPSConnection(uri_base)
-    conn.request("POST", "/face/v1.0/persongroups/{}/persons/{}/persistedFaces?%s".format(personGroupId, personId) % params, body, headers)
+    conn.request("POST",
+                 "/face/v1.0/persongroups/{}/persons/{}/persistedFaces?%s".format(personGroupId, personId) % params,
+                 body, headers)
     response = conn.getresponse()
     data = json.loads(response.read())
-    print(data)
     conn.close()
+    if "persistedFaceId" not in data:
+        return None
     return data["persistedFaceId"]
 
 
@@ -161,7 +183,8 @@ def get_personGroupPerson(personGroupId, personId):
     body = json.dumps({})
 
     conn = http.client.HTTPSConnection(uri_base)
-    conn.request("GET", "/face/v1.0/persongroups/{}/persons/{}?%s".format(personGroupId, personId) % params, body, headers)
+    conn.request("GET", "/face/v1.0/persongroups/{}/persons/{}?%s".format(personGroupId, personId) % params, body,
+                 headers)
     response = conn.getresponse()
     data = json.loads(response.read())
     print(data)
@@ -208,6 +231,7 @@ def eval(original_faceIds, personGroupId, protect_personId):
     conn.close()
 
     face = data[0]
+    print(face)
     if len(face["candidates"]) and face["candidates"][0]["personId"] == protect_personId:
         return True
     else:
@@ -225,39 +249,12 @@ def delete_personGroupPerson(personGroupId, personId):
     body = json.dumps({})
 
     conn = http.client.HTTPSConnection(uri_base)
-    conn.request("DELETE", "/face/v1.0/persongroups/{}/persons/{}?%s".format(personGroupId, personId) % params, body, headers)
+    conn.request("DELETE", "/face/v1.0/persongroups/{}/persons/{}?%s".format(personGroupId, personId) % params, body,
+                 headers)
     response = conn.getresponse()
     data = response.read()
     print(data)
     conn.close()
-
-
-def add_protect_person(personGroupId, name):
-    personId = create_personId(personGroupId, name)
-    for idx in range(72):
-        cloaked_image_url = "https://super.cs.uchicago.edu/~shawn/cloaked/{}_c.png".format(idx)
-        add_persistedFaceId(personGroupId, personId, cloaked_image_url)
-
-
-def add_sybil_person(personGroupId, name):
-    personId = create_personId(personGroupId, name)
-    for idx in range(82):
-        try:
-            cloaked_image_url = "https://super.cs.uchicago.edu/~shawn/sybils/{}_c.png".format(idx)
-            add_persistedFaceId(personGroupId, personId, cloaked_image_url)
-        except:
-            print(idx)
-
-
-def add_other_person(personGroupId):
-    for idx_person in range(65):
-        personId = create_personId(personGroupId, str(idx_person))
-        for idx_image in range(90):
-            try:
-                image_url = "https://super.cs.uchicago.edu/~shawn/train/{}/{}.png".format(idx_person, idx_image)
-                add_persistedFaceId(personGroupId, personId, image_url)
-            except:
-                print(idx_person, idx_image)
 
 
 def get_trainStatus(personGroupId):
@@ -265,8 +262,7 @@ def get_trainStatus(personGroupId):
         'Ocp-Apim-Subscription-Key': subscription_key,
     }
 
-    params = urllib.parse.urlencode({
-    })
+    params = urllib.parse.urlencode({})
 
     body = json.dumps({})
 
@@ -278,48 +274,75 @@ def get_trainStatus(personGroupId):
     conn.close()
 
 
-def test_original():
-    personGroupId = 'pubfig'
-    # create_personGroupId(personGroupId, 'pubfig')
-    # add protect person
-    protect_personId = 'd3df3012-6f3f-4c1b-b86d-55e91a352e01'
-    #protect_personId = create_personId(personGroupId, 'Emily')
-    #for idx in range(50):
-    #    image_url = "https://super.cs.uchicago.edu/~shawn/cloaked/{}_o.png".format(idx)
-    #    add_persistedFaceId(personGroupId, protect_personId, image_url)
+def test_cloak():
+    NUM_TRAIN = 10
+    total_idx = range(0, 82)
+    TRAIN_RANGE = random.sample(total_idx, NUM_TRAIN)
+
+    TEST_RANGE = TRAIN_RANGE
+
+    personGroupId = 'all'
+
+    # delete_personGroup(personGroupId)
+    create_personGroupId(personGroupId, personGroupId)
+
+    with open("protect_personId.txt", 'r') as f:
+        protect_personId = f.read()
+    print(protect_personId)
+    delete_personGroupPerson(personGroupId, protect_personId)
+
+    protect_personId = create_personId(personGroupId, 'Emily')
+    with open("protect_personId.txt", 'w') as f:
+        f.write(protect_personId)
+
+    print("Created protect personId: {}".format(protect_personId))
+    for idx in TRAIN_RANGE:
+        image_url = cloak_image_base.format(idx)
+        r = add_persistedFaceId(personGroupId, protect_personId, image_url)
+        if r is not None:
+            print("Added {}".format(idx))
+        else:
+            print("Unable to add {}-th image of protect person".format(idx))
 
     # add other people
-    #for idx_person in range(65):
-    #    personId = create_personId(personGroupId, str(idx_person))
-    #    for idx_image in range(50):
-    #        try:
-    #            image_url = "https://super.cs.uchicago.edu/~shawn/train/{}/{}.png".format(idx_person, idx_image)
-    #            add_persistedFaceId(personGroupId, personId, image_url)
-    #        except:
-    #            print(idx_person, idx_image)
-
+    for idx_person in range(500):
+        personId = create_personId(personGroupId, str(idx_person))
+        print("Created personId: {}".format(idx_person))
+        for idx_image in range(10):
+            image_url = "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(
+                idx_person, idx_image)
+            r = add_persistedFaceId(personGroupId, personId, image_url)
+            if r is not None:
+                print("Added {}".format(idx_image))
+            else:
+                print("Unable to add {}-th image".format(idx_image))
 
     # train model based on personGroup
-    #train_personGroup(personGroupId)
-    #time.sleep(3)
-    #get_trainStatus(personGroupId)
-    #list_personGroupPerson(personGroupId)
+    train_personGroup(personGroupId)
+    time.sleep(4)
+    get_trainStatus(personGroupId)
+    # list_personGroupPerson(personGroupId)
 
-    idx_range = range(50, 82)
+    # test original image
+    idx_range = TEST_RANGE
     acc = 0.
-
+    tot = 0.
     for idx in idx_range:
-        original_image_url = "https://super.cs.uchicago.edu/~shawn/cloaked/{}_o.png".format(idx)
+        original_image_url = original_image_base.format(idx)
         faceId = detect_face(original_image_url)
+        if faceId is None:
+            print("{} does not exist".format(idx))
+            continue
         original_faceIds = [faceId]
 
         # verify
         res = eval(original_faceIds, personGroupId, protect_personId)
         if res:
             acc += 1.
+        tot += 1.
 
-    acc /= len(idx_range)
-    print(acc) # 1.0
+    acc /= tot
+    print(acc)  # 1.0
 
 
 def list_personGroups():
@@ -358,42 +381,37 @@ def delete_personGroup(personGroupId):
     conn.close()
 
 
-
 def main():
+    test_cloak()
+
     # delete_personGroup('cloaking')
     # delete_personGroup('cloaking-emily')
     # delete_personGroup('pubfig')
     # list_personGroups()
     # exit()
-    personGroupId = 'cloaking'
+    # personGroupId = 'cloaking'
     # create_personGroupId(personGroupId, 'cloaking')
-    list_personGroups()
-    exit()
-    #delete_personGroupPerson(personGroupId, '0ac606cd-24b3-440f-866a-31adf2a1b446')
-    #add_protect_person(personGroupId, 'Emily')
-    #personId = create_personId(personGroupId, 'Emily')
-    #add_sybil_person(personGroupId, 'sybil')
-    protect_personId = '6c5a71eb-f39a-4570-b3f5-72cca3ab5a6b'
-    #delete_personGroupPerson(personGroupId, protect_personId)
-    #add_protect_person(personGroupId, 'Emily')
-
-    # train model based on personGroup
-    #train_personGroup(personGroupId)
-    get_trainStatus(personGroupId)
-    #add_other_person(personGroupId)
-    #list_personGroupPerson(personGroupId)
-    #delete_personGroupPerson(personGroupId, '80e32c80-bc69-416a-9dff-c8d42d7a3301')
-
-    idx_range = range(72, 82)
-    original_faceIds = []
-    for idx in idx_range:
-        original_image_url = "https://super.cs.uchicago.edu/~shawn/cloaked/{}_o.png".format(idx)
-        faceId = detect_face(original_image_url)
-        original_faceIds.append(faceId)
-
-        # verify
-        eval(original_faceIds, personGroupId, protect_personId)
+    # delete_personGroupPerson(personGroupId, '0ac606cd-24b3-440f-866a-31adf2a1b446')
+    # add_protect_person(personGroupId, 'Emily')
+    # protect_personId = create_personId(personGroupId, 'Emily')
+    # add_sybil_person(personGroupId, 'sybil')
+    #
+    # # train model based on personGroup
+    # train_personGroup(personGroupId)
+    # get_trainStatus(personGroupId)
+    # add_other_person(personGroupId)
+    # list_personGroupPerson(personGroupId)
+    #
+    # idx_range = range(72, 82)
+    # original_faceIds = []
+    # for idx in idx_range:
+    #     original_image_url = "https://super.cs.uchicago.edu/~shawn/cloaked/{}_o.png".format(idx)
+    #     faceId = detect_face(original_image_url)
+    #     original_faceIds.append(faceId)
+    #
+    #     # verify
+    #     eval(original_faceIds, personGroupId, protect_personId)
 
 
 if __name__ == '__main__':
-    main()
+    test_cloak()
