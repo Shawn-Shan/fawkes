@@ -4,7 +4,13 @@ import json
 import os
 import pickle
 import random
+import shutil
 import sys
+import tarfile
+import zipfile
+
+import six
+from six.moves.urllib.error import HTTPError, URLError
 
 stderr = sys.stderr
 sys.stderr = open(os.devnull, 'w')
@@ -15,15 +21,40 @@ import keras.backend as K
 import numpy as np
 import tensorflow as tf
 from PIL import Image, ExifTags
-# from keras.applications.vgg16 import preprocess_input
 from keras.layers import Dense, Activation
 from keras.models import Model
 from keras.preprocessing import image
-from keras.utils import get_file
 from skimage.transform import resize
 from sklearn.metrics import pairwise_distances
 
+
 from .align_face import align, aligner
+from six.moves.urllib.request import urlopen
+
+if sys.version_info[0] == 2:
+    def urlretrieve(url, filename, reporthook=None, data=None):
+        def chunk_read(response, chunk_size=8192, reporthook=None):
+            content_type = response.info().get('Content-Length')
+            total_size = -1
+            if content_type is not None:
+                total_size = int(content_type.strip())
+            count = 0
+            while True:
+                chunk = response.read(chunk_size)
+                count += 1
+                if reporthook is not None:
+                    reporthook(count, chunk_size, total_size)
+                if chunk:
+                    yield chunk
+                else:
+                    break
+
+        response = urlopen(url, data)
+        with open(filename, 'wb') as fd:
+            for chunk in chunk_read(response, reporthook=reporthook):
+                fd.write(chunk)
+else:
+    from six.moves.urllib.request import urlretrieve
 
 
 def clip_img(X, preprocessing='raw'):
@@ -57,13 +88,16 @@ def load_image(path):
 
 
 class Faces(object):
-    def __init__(self, image_paths, sess):
+    def __init__(self, image_paths, sess, verbose=1):
+        self.verbose = verbose
         self.aligner = aligner(sess)
         self.org_faces = []
         self.cropped_faces = []
         self.cropped_faces_shape = []
         self.cropped_index = []
         self.callback_idx = []
+        if verbose:
+            print("Identify {} images".format(len(image_paths)))
         for i, p in enumerate(image_paths):
             cur_img = load_image(p)
             self.org_faces.append(cur_img)
@@ -73,6 +107,9 @@ class Faces(object):
             cur_shapes = [f.shape[:-1] for f in cur_faces]
 
             cur_faces_square = []
+            if verbose:
+                print("Find {} face(s) in {}".format(len(cur_faces), p.split("/")[-1]))
+
             for img in cur_faces:
                 long_size = max([img.shape[1], img.shape[0]])
                 base = np.zeros((long_size, long_size, 3))
@@ -270,7 +307,7 @@ def imagenet_reverse_preprocessing(x, data_format=None):
 
 
 def reverse_process_cloaked(x, preprocess='imagenet'):
-    x = clip_img(x, preprocess)
+    # x = clip_img(x, preprocess)
     return reverse_preprocess(x, preprocess)
 
 
@@ -286,16 +323,17 @@ def load_extractor(name):
     model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
     os.makedirs(model_dir, exist_ok=True)
     model_file = os.path.join(model_dir, "{}.h5".format(name))
+    emb_file = os.path.join(model_dir, "{}_emb.p.gz".format(name))
     if os.path.exists(model_file):
         model = keras.models.load_model(model_file)
     else:
         get_file("{}.h5".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
                  cache_dir=model_dir, cache_subdir='')
+        model = keras.models.load_model(model_file)
 
+    if not os.path.exists(emb_file):
         get_file("{}_emb.p.gz".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}_emb.p.gz".format(name),
                  cache_dir=model_dir, cache_subdir='')
-
-        model = keras.models.load_model(model_file)
 
     if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
         raise Exception(
@@ -404,12 +442,18 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     max_id = np.argmax(max_sum)
 
     target_data_id = paths[int(max_id)]
-    image_dir = os.path.join(model_dir, "target_data/{}/*".format(target_data_id))
-    if not os.path.exists(image_dir):
-        get_file("{}.h5".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/target_images".format(name),
-                 cache_dir=model_dir, cache_subdir='')
+    image_dir = os.path.join(model_dir, "target_data/{}".format(target_data_id))
+    # if not os.path.exists(image_dir):
+    os.makedirs(os.path.join(model_dir, "target_data"), exist_ok=True)
+    os.makedirs(image_dir, exist_ok=True)
+    for i in range(10):
+        if os.path.exists(os.path.join(model_dir, "target_data/{}/{}.jpg".format(target_data_id, i))):
+            continue
+        get_file("{}.jpg".format(i),
+                 "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
+                 cache_dir=model_dir, cache_subdir='target_data/{}/'.format(target_data_id))
 
-    image_paths = glob.glob(image_dir)
+    image_paths = glob.glob(image_dir + "/*.jpg")
 
     target_images = [image.img_to_array(image.load_img(cur_path)) for cur_path in
                      image_paths]
@@ -423,6 +467,107 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
 
     target_images = random.sample(target_images, len(imgs))
     return np.array(target_images)
+
+
+def get_file(fname,
+             origin,
+             untar=False,
+             md5_hash=None,
+             file_hash=None,
+             cache_subdir='datasets',
+             hash_algorithm='auto',
+             extract=False,
+             archive_format='auto',
+             cache_dir=None):
+    if cache_dir is None:
+        cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
+    if md5_hash is not None and file_hash is None:
+        file_hash = md5_hash
+        hash_algorithm = 'md5'
+    datadir_base = os.path.expanduser(cache_dir)
+    if not os.access(datadir_base, os.W_OK):
+        datadir_base = os.path.join('/tmp', '.keras')
+    datadir = os.path.join(datadir_base, cache_subdir)
+    _makedirs_exist_ok(datadir)
+
+    if untar:
+        untar_fpath = os.path.join(datadir, fname)
+        fpath = untar_fpath + '.tar.gz'
+    else:
+        fpath = os.path.join(datadir, fname)
+
+    download = False
+    if not os.path.exists(fpath):
+        download = True
+
+    if download:
+        error_msg = 'URL fetch failure on {}: {} -- {}'
+        dl_progress = None
+        try:
+            try:
+                urlretrieve(origin, fpath, dl_progress)
+            except HTTPError as e:
+                raise Exception(error_msg.format(origin, e.code, e.msg))
+            except URLError as e:
+                raise Exception(error_msg.format(origin, e.errno, e.reason))
+        except (Exception, KeyboardInterrupt) as e:
+            if os.path.exists(fpath):
+                os.remove(fpath)
+            raise
+        # ProgressTracker.progbar = None
+
+    if untar:
+        if not os.path.exists(untar_fpath):
+            _extract_archive(fpath, datadir, archive_format='tar')
+        return untar_fpath
+
+    if extract:
+        _extract_archive(fpath, datadir, archive_format)
+
+    return fpath
+
+
+def _extract_archive(file_path, path='.', archive_format='auto'):
+    if archive_format is None:
+        return False
+    if archive_format == 'auto':
+        archive_format = ['tar', 'zip']
+    if isinstance(archive_format, six.string_types):
+        archive_format = [archive_format]
+
+    for archive_type in archive_format:
+        if archive_type == 'tar':
+            open_fn = tarfile.open
+            is_match_fn = tarfile.is_tarfile
+        if archive_type == 'zip':
+            open_fn = zipfile.ZipFile
+            is_match_fn = zipfile.is_zipfile
+
+        if is_match_fn(file_path):
+            with open_fn(file_path) as archive:
+                try:
+                    archive.extractall(path)
+                except (tarfile.TarError, RuntimeError, KeyboardInterrupt):
+                    if os.path.exists(path):
+                        if os.path.isfile(path):
+                            os.remove(path)
+                        else:
+                            shutil.rmtree(path)
+                    raise
+            return True
+    return False
+
+
+def _makedirs_exist_ok(datadir):
+    if six.PY2:
+        # Python 2 doesn't have the exist_ok arg, so we try-except here.
+        try:
+            os.makedirs(datadir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+    else:
+        os.makedirs(datadir, exist_ok=True)  # pylint: disable=unexpected-keyword-arg
 
 # class CloakData(object):
 #     def __init__(self, protect_directory=None, img_shape=(224, 224)):

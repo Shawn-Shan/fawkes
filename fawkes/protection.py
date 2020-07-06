@@ -7,6 +7,7 @@ import glob
 import os
 import random
 import sys
+import time
 
 import numpy as np
 
@@ -17,12 +18,10 @@ from .utils import load_extractor, init_gpu, select_target_label, dump_image, re
 random.seed(12243)
 np.random.seed(122412)
 
-BATCH_SIZE = 32
-
 
 def generate_cloak_images(sess, feature_extractors, image_X, target_emb=None, th=0.01, faces=None, sd=1e9, lr=2,
-                          max_step=500):
-    batch_size = BATCH_SIZE if len(image_X) > BATCH_SIZE else len(image_X)
+                          max_step=500, batch_size=1):
+    batch_size = batch_size if len(image_X) > batch_size else len(image_X)
 
     differentiator = FawkesMaskGeneration(sess, feature_extractors,
                                           batch_size=batch_size,
@@ -50,11 +49,11 @@ def check_imgs(imgs):
 
 
 def main(*argv):
+    start_time = time.time()
     if not argv:
         argv = list(sys.argv)
 
-    # attach SIGPIPE handler to properly handle broken pipe
-    try:  # sigpipe not available under windows. just ignore in this case
+    try:
         import signal
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     except Exception as e:
@@ -78,25 +77,34 @@ def main(*argv):
     parser.add_argument('--sd', type=int, default=1e9)
     parser.add_argument('--lr', type=float, default=2)
 
+    parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--separate_target', action='store_true')
 
     parser.add_argument('--format', type=str,
                         help="final image format",
-                        default="jpg")
+                        default="png")
     args = parser.parse_args(argv[1:])
 
     if args.mode == 'low':
         args.feature_extractor = "high_extract"
         args.th = 0.003
+        args.max_step = 100
+        args.lr = 15
     elif args.mode == 'mid':
         args.feature_extractor = "high_extract"
         args.th = 0.005
+        args.max_step = 100
+        args.lr = 15
     elif args.mode == 'high':
         args.feature_extractor = "high_extract"
         args.th = 0.007
+        args.max_step = 100
+        args.lr = 10
     elif args.mode == 'ultra':
         args.feature_extractor = "high_extract"
         args.th = 0.01
+        args.max_step = 1000
+        args.lr = 5
     elif args.mode == 'custom':
         pass
     else:
@@ -116,7 +124,7 @@ def main(*argv):
         print("No images in the directory")
         exit(1)
 
-    faces = Faces(image_paths, sess)
+    faces = Faces(image_paths, sess, verbose=1)
 
     orginal_images = faces.cropped_faces
     orginal_images = np.array(orginal_images)
@@ -133,7 +141,7 @@ def main(*argv):
 
     protected_images = generate_cloak_images(sess, feature_extractors_ls, orginal_images,
                                              target_emb=target_embedding, th=args.th, faces=faces, sd=args.sd,
-                                             lr=args.lr, max_step=args.max_step)
+                                             lr=args.lr, max_step=args.max_step, batch_size=args.batch_size)
 
     faces.cloaked_cropped_faces = protected_images
 
@@ -141,8 +149,11 @@ def main(*argv):
     final_images = faces.merge_faces(cloak_perturbation)
 
     for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
-        file_name = "{}_{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), args.mode, args.th, args.format)
+        file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), args.mode, args.format)
         dump_image(p_img, file_name, format=args.format)
+
+    elapsed_time = time.time() - start_time
+    print('attack cost %f s' % (elapsed_time))
 
 
 if __name__ == '__main__':
