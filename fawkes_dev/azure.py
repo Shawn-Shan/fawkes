@@ -46,7 +46,8 @@ def detect_face(image_url):
     conn.request("POST", "/face/v1.0/detect?%s" % params, body, headers)
     response = conn.getresponse()
     data = json.loads(response.read())
-    print(data)
+    #
+    # print(data)
     conn.close()
     return data[0]["faceId"]
 
@@ -229,7 +230,6 @@ def eval(original_faceIds, personGroupId, protect_personId):
     response = conn.getresponse()
     data = json.loads(response.read())
     conn.close()
-
     face = data[0]
     print(face)
     if len(face["candidates"]) and face["candidates"][0]["personId"] == protect_personId:
@@ -270,8 +270,8 @@ def get_trainStatus(personGroupId):
     conn.request("GET", "/face/v1.0/persongroups/{}/training?%s".format(personGroupId) % params, body, headers)
     response = conn.getresponse()
     data = response.read()
-    print(data)
     conn.close()
+    return data
 
 
 def test_cloak():
@@ -279,12 +279,12 @@ def test_cloak():
     total_idx = range(0, 82)
     TRAIN_RANGE = random.sample(total_idx, NUM_TRAIN)
 
-    TEST_RANGE = TRAIN_RANGE
+    TEST_RANGE = random.sample([i for i in total_idx if i not in TRAIN_RANGE], 20)
 
     personGroupId = 'all'
 
     # delete_personGroup(personGroupId)
-    create_personGroupId(personGroupId, personGroupId)
+    # create_personGroupId(personGroupId, personGroupId)
 
     with open("protect_personId.txt", 'r') as f:
         protect_personId = f.read()
@@ -305,22 +305,25 @@ def test_cloak():
             print("Unable to add {}-th image of protect person".format(idx))
 
     # add other people
-    for idx_person in range(500):
-        personId = create_personId(personGroupId, str(idx_person))
-        print("Created personId: {}".format(idx_person))
-        for idx_image in range(10):
-            image_url = "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(
-                idx_person, idx_image)
-            r = add_persistedFaceId(personGroupId, personId, image_url)
-            if r is not None:
-                print("Added {}".format(idx_image))
-            else:
-                print("Unable to add {}-th image".format(idx_image))
+    # for idx_person in range(1300, 5000):
+    #     personId = create_personId(personGroupId, str(idx_person))
+    #     print("Created personId: {}".format(idx_person))
+    #     for idx_image in range(10):
+    #         image_url = "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(
+    #             idx_person, idx_image)
+    #         r = add_persistedFaceId(personGroupId, personId, image_url)
+    #         if r is not None:
+    #             print("Added {}".format(idx_image))
+    #         else:
+    #             print("Unable to add {}-th image".format(idx_image))
 
     # train model based on personGroup
+
     train_personGroup(personGroupId)
-    time.sleep(4)
-    get_trainStatus(personGroupId)
+
+    while json.loads(get_trainStatus(personGroupId))['status'] != 'succeeded':
+        time.sleep(2)
+
     # list_personGroupPerson(personGroupId)
 
     # test original image

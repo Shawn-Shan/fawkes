@@ -8,12 +8,15 @@ import os
 import random
 import sys
 import time
+import tensorflow as tf
+import logging
+logging.getLogger('tensorflow').disabled = True
 
 import numpy as np
-
-from .differentiator import FawkesMaskGeneration
-from .utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
+from fawkes.differentiator import FawkesMaskGeneration
+from fawkes.utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
     Faces
+
 
 random.seed(12243)
 np.random.seed(122412)
@@ -63,11 +66,11 @@ def main(*argv):
     parser.add_argument('--directory', '-d', type=str,
                         help='directory that contain images for cloaking', default='imgs/')
 
-    parser.add_argument('--gpu', type=str,
+    parser.add_argument('--gpu', '-g', type=str,
                         help='GPU id', default='0')
 
-    parser.add_argument('--mode', type=str,
-                        help='cloak generation mode', default='high')
+    parser.add_argument('--mode', '-m', type=str,
+                        help='cloak generation mode', default='mid')
     parser.add_argument('--feature-extractor', type=str,
                         help="name of the feature extractor used for optimization",
                         default="high_extract")
@@ -88,12 +91,12 @@ def main(*argv):
     if args.mode == 'low':
         args.feature_extractor = "high_extract"
         args.th = 0.003
-        args.max_step = 100
-        args.lr = 15
+        args.max_step = 20
+        args.lr = 20
     elif args.mode == 'mid':
         args.feature_extractor = "high_extract"
-        args.th = 0.005
-        args.max_step = 100
+        args.th = 0.004
+        args.max_step = 50
         args.lr = 15
     elif args.mode == 'high':
         args.feature_extractor = "high_extract"
@@ -101,10 +104,14 @@ def main(*argv):
         args.max_step = 100
         args.lr = 10
     elif args.mode == 'ultra':
+        if not tf.test.is_gpu_available():
+            print("Please enable GPU for ultra setting...")
+            sys.exit(1)
+        # args.feature_extractor = ["high_extract", 'high2_extract']
         args.feature_extractor = "high_extract"
-        args.th = 0.01
-        args.max_step = 1000
-        args.lr = 5
+        args.th = 0.015
+        args.max_step = 2000
+        args.lr = 8
     elif args.mode == 'custom':
         pass
     else:
@@ -115,19 +122,22 @@ def main(*argv):
         args.format = 'jpeg'
 
     sess = init_gpu(args.gpu)
-    fs_names = [args.feature_extractor]
-    feature_extractors_ls = [load_extractor(name) for name in fs_names]
 
     image_paths = glob.glob(os.path.join(args.directory, "*"))
     image_paths = [path for path in image_paths if "_cloaked" not in path.split("/")[-1]]
     if not image_paths:
-        print("No images in the directory")
-        exit(1)
+        raise Exception("No images in the directory")
 
     faces = Faces(image_paths, sess, verbose=1)
 
     orginal_images = faces.cropped_faces
     orginal_images = np.array(orginal_images)
+
+    fs_names = [args.feature_extractor]
+    if isinstance(args.feature_extractor, list):
+        fs_names = args.feature_extractor
+
+    feature_extractors_ls = [load_extractor(name) for name in fs_names]
 
     if args.separate_target:
         target_embedding = []
@@ -154,6 +164,7 @@ def main(*argv):
 
     elapsed_time = time.time() - start_time
     print('attack cost %f s' % (elapsed_time))
+    print("Done!")
 
 
 if __name__ == '__main__':

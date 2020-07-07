@@ -11,7 +11,7 @@ from decimal import Decimal
 import numpy as np
 import tensorflow as tf
 
-from .utils import preprocess, reverse_preprocess
+from fawkes.utils import preprocess, reverse_preprocess
 
 
 class FawkesMaskGeneration:

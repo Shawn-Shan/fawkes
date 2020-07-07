@@ -1,38 +1,15 @@
 """ Tensorflow implementation of the face detection / alignment algorithm found at
 https://github.com/kpzhang93/MTCNN_face_detection_alignment
 """
-# MIT License
-# 
-# Copyright (c) 2016 David Sandberg
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
+import gzip
 import os
+import pickle
 
-import cv2
 import numpy as np
 import tensorflow as tf
 from six import string_types, iteritems
+from skimage.transform import resize
 
 
 def layer(op):
@@ -78,13 +55,12 @@ class Network(object):
         """Construct the network. """
         raise NotImplementedError('Must be implemented by the subclass.')
 
-    def load(self, data_path, session, ignore_missing=False):
+    def load(self, data_dict, session, ignore_missing=False):
         """Load network weights.
         data_path: The path to the numpy-serialized network weights
         session: The current TensorFlow session
         ignore_missing: If true, serialized weights for missing layers are ignored.
         """
-        data_dict = np.load(data_path, encoding='latin1').item()  # pylint: disable=no-member
 
         for op_name in data_dict:
             with tf.variable_scope(op_name, reuse=True):
@@ -280,21 +256,27 @@ class ONet(Network):
 
 
 def create_mtcnn(sess, model_path):
-    if not model_path:
-        model_path, _ = os.path.split(os.path.realpath(__file__))
+    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+    os.makedirs(model_dir, exist_ok=True)
+
+    fp = gzip.open(os.path.join(model_dir, "mtcnn.p.gz"), 'rb')
+    dnet_weights = pickle.load(fp)
+    fp.close()
 
     with tf.variable_scope('pnet'):
         data = tf.placeholder(tf.float32, (None, None, None, 3), 'input')
         pnet = PNet({'data': data})
-        pnet.load(os.path.join(model_path, 'weights/det1.npy'), sess)
+
+        # data_dict = np.load(data_path, encoding='latin1').item()  # pylint: disable=no-member
+        pnet.load(dnet_weights[0], sess)
     with tf.variable_scope('rnet'):
         data = tf.placeholder(tf.float32, (None, 24, 24, 3), 'input')
         rnet = RNet({'data': data})
-        rnet.load(os.path.join(model_path, 'weights/det2.npy'), sess)
+        rnet.load(dnet_weights[1], sess)
     with tf.variable_scope('onet'):
         data = tf.placeholder(tf.float32, (None, 48, 48, 3), 'input')
         onet = ONet({'data': data})
-        onet.load(os.path.join(model_path, 'weights/det3.npy'), sess)
+        onet.load(dnet_weights[2], sess)
 
     pnet_fun = lambda img: sess.run(('pnet/conv4-2/BiasAdd:0', 'pnet/prob1:0'), feed_dict={'pnet/input:0': img})
     rnet_fun = lambda img: sess.run(('rnet/conv5-2/conv5-2:0', 'rnet/prob1:0'), feed_dict={'rnet/input:0': img})
@@ -303,7 +285,7 @@ def create_mtcnn(sess, model_path):
     return pnet_fun, rnet_fun, onet_fun
 
 
-def detect_face(img, minsize, pnet, rnet, onet, threshold, factor):
+def run_detect_face(img, minsize, pnet, rnet, onet, threshold, factor):
     """Detects faces in an image, and returns bounding boxes and points for them.
     img: input image
     minsize: minimum faces' size
@@ -367,11 +349,15 @@ def detect_face(img, minsize, pnet, rnet, onet, threshold, factor):
         tempimg = np.zeros((24, 24, 3, numbox))
         for k in range(0, numbox):
             tmp = np.zeros((int(tmph[k]), int(tmpw[k]), 3))
+            # try:
             tmp[dy[k] - 1:edy[k], dx[k] - 1:edx[k], :] = img[y[k] - 1:ey[k], x[k] - 1:ex[k], :]
+            # except ValueError:
+            #     continue
             if tmp.shape[0] > 0 and tmp.shape[1] > 0 or tmp.shape[0] == 0 and tmp.shape[1] == 0:
                 tempimg[:, :, :, k] = imresample(tmp, (24, 24))
             else:
                 return np.empty()
+
         tempimg = (tempimg - 127.5) * 0.0078125
         tempimg1 = np.transpose(tempimg, (3, 1, 0, 2))
         out = rnet(tempimg1)
@@ -776,18 +762,20 @@ def rerec(bboxA):
 
 
 def imresample(img, sz):
-    im_data = cv2.resize(img, (sz[1], sz[0]), interpolation=cv2.INTER_AREA)  # @UndefinedVariable
+    from keras.preprocessing import image
+    # im_data = resize(img, (sz[0], sz[1]))
+    im_data = image.array_to_img(img).resize((sz[1], sz[0]))
+    im_data = image.img_to_array(im_data)
     return im_data
 
-    # This method is kept for debugging purpose
-#     h=img.shape[0]
-#     w=img.shape[1]
-#     hs, ws = sz
-#     dx = float(w) / ws
-#     dy = float(h) / hs
-#     im_data = np.zeros((hs,ws,3))
-#     for a1 in range(0,hs):
-#         for a2 in range(0,ws):
-#             for a3 in range(0,3):
-#                 im_data[a1,a2,a3] = img[int(floor(a1*dy)),int(floor(a2*dx)),a3]
+# def imresample(img, sz):
+#     import cv2
+#     im_data = cv2.resize(img, (sz[1], sz[0]), interpolation=cv2.INTER_AREA)  # @UndefinedVariable
 #     return im_data
+
+
+def to_rgb(img):
+    w, h = img.shape
+    ret = np.empty((w, h, 3), dtype=np.uint8)
+    ret[:, :, 0] = ret[:, :, 1] = ret[:, :, 2] = img
+    return ret
