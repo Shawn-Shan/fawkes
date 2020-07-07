@@ -29,9 +29,9 @@ when --mode is `custom`:
 * `--feature-extractor` : name of the feature extractor to use
 * `--separate_target`   : whether select separate targets for each faces in the diectory. 
 
+### Example
 
-
-
+`fawkes -d ./imgs --mode mid`
 
 ### Tips
 
