@@ -4,21 +4,17 @@
 # @Link    : https://www.shawnshan.com/
 
 
-__version__ = '0.0.2'
+__version__ = '0.0.5'
 
+from .detect_faces import create_mtcnn, run_detect_face
 from .differentiator import FawkesMaskGeneration
-from .utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
-    Faces
 from .protection import main
-import logging
-import sys
-import os
-logging.getLogger('tensorflow').disabled = True
-
+from .utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, Faces, get_file
 
 __all__ = (
-    '__version__',
+    '__version__', 'create_mtcnn', 'run_detect_face',
     'FawkesMaskGeneration', 'load_extractor',
     'init_gpu',
-    'select_target_label', 'dump_image', 'reverse_process_cloaked', 'Faces', 'main'
+    'select_target_label', 'dump_image', 'reverse_process_cloaked',
+    'Faces', 'get_file', 'main',
 )

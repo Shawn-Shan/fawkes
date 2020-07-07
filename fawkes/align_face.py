@@ -1,7 +1,6 @@
-from .detect_face import detect_face, create_mtcnn
 import numpy as np
+from fawkes import create_mtcnn, run_detect_face
 
-# modify the default parameters of np.load
 np_load_old = np.load
 np.load = lambda *a, **k: np_load_old(*a, allow_pickle=True, **k)
 
@@ -30,7 +29,7 @@ def align(orig_img, aligner, margin=0.8, detect_multiple_faces=True):
         orig_img = to_rgb(orig_img)
     orig_img = orig_img[:, :, 0:3]
 
-    bounding_boxes, _ = detect_face(orig_img, minsize, pnet, rnet, onet, threshold, factor)
+    bounding_boxes, _ = run_detect_face(orig_img, minsize, pnet, rnet, onet, threshold, factor)
     nrof_faces = bounding_boxes.shape[0]
     if nrof_faces > 0:
         det = bounding_boxes[:, 0:4]
@@ -66,14 +65,6 @@ def align(orig_img, aligner, margin=0.8, detect_multiple_faces=True):
             cropped = orig_img[bb[1]:bb[3], bb[0]:bb[2], :]
             cropped_arr.append(cropped)
             bounding_boxes_arr.append([bb[0], bb[1], bb[2], bb[3]])
-            # scaled = misc.imresize(cropped, (image_size, image_size), interp='bilinear')
         return cropped_arr, bounding_boxes_arr
     else:
         return None
-#
-# if __name__ == '__main__':
-#     orig_img = misc.imread('orig_img.jpeg')
-#     cropped_arr, bounding_boxes_arr = align(orig_img)
-#     misc.imsave('test_output.jpeg', cropped_arr[0])
-#     print(bounding_boxes_arr)
-#

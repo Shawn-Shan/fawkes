@@ -75,13 +75,15 @@ class DeployCommand(Command):
 setup_requires = []
 
 install_requires = [
-    'numpy>=1.16.4',
-    'tensorflow>=1.13.1',
+    'numpy==1.16.4',
+    # 'tensorflow-gpu>=1.13.1, <=1.14.0',
+    'tensorflow>=1.13.1, <=1.14.0',
     'argparse',
     'keras==2.2.5',
     'scikit-image',
     'pillow>=7.0.0',
     'opencv-python>=4.2.0.34',
+    'sklearn',
 ]
 
 setup(

@@ -6,10 +6,10 @@ We published an academic paper to summary our work "[Fawkes: Protecting Personal
 
 
 ### BEFORE YOU RUN OUR CODE
+
+If you would like to use Fawkes to protect your images, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
+
 If you are a developer or researcher planning to customize and modify on our existing code. Please refer to [fawkes_dev](https://github.com/Shawn-Shan/fawkes/tree/master/fawkes_dev). 
-
-### How to protect my image
-
 
 ### Citation
 ```
