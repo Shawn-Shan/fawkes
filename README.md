@@ -11,6 +11,12 @@ If you would like to use Fawkes to protect your images, please check out our bin
 
 If you are a developer or researcher planning to customize and modify on our existing code. Please refer to [fawkes_dev](https://github.com/Shawn-Shan/fawkes/tree/master/fawkes_dev). 
 
+
+### INSTALL FAWKES
+Fawkes can be installed with pip. Simply run: 
+`pip install fawkes`
+
+
 ### Citation
 ```
 @inproceedings{shan2020fawkes,
