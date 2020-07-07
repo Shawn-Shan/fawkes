@@ -12,6 +12,8 @@ fawkes.egg-info
 .coverage
 .cache
 .pytest_cache
+fawkes_dev/api_key.txt
+fawkes_dev/protect_personId.txt
 
 # developer environments
 .idea
