@@ -102,26 +102,26 @@ class Fawkes(object):
 
         faces = Faces(image_paths, self.sess, verbose=1)
 
-        orginal_images = faces.cropped_faces
-        orginal_images = np.array(orginal_images)
+        original_images = faces.cropped_faces
+        original_images = np.array(original_images)
 
         if separate_target:
             target_embedding = []
-            for org_img in orginal_images:
+            for org_img in original_images:
                 org_img = org_img.reshape([1] + list(org_img.shape))
                 tar_emb = select_target_label(org_img, self.feature_extractors_ls, self.fs_names)
                 target_embedding.append(tar_emb)
             target_embedding = np.concatenate(target_embedding)
         else:
-            target_embedding = select_target_label(orginal_images, self.feature_extractors_ls, self.fs_names)
+            target_embedding = select_target_label(original_images, self.feature_extractors_ls, self.fs_names)
 
-        protected_images = generate_cloak_images(self.sess, self.feature_extractors_ls, orginal_images,
+        protected_images = generate_cloak_images(self.sess, self.feature_extractors_ls, original_images,
                                                  target_emb=target_embedding, th=th, faces=faces, sd=sd,
                                                  lr=lr, max_step=max_step, batch_size=batch_size)
 
         faces.cloaked_cropped_faces = protected_images
 
-        cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(orginal_images)
+        cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(original_images)
         final_images = faces.merge_faces(cloak_perturbation)
 
         for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
@@ -129,7 +129,7 @@ class Fawkes(object):
             dump_image(p_img, file_name, format=format)
 
         elapsed_time = time.time() - start_time
-        print('attack cost %f s' % (elapsed_time))
+        print('attack cost %f s' % elapsed_time)
         print("Done!")
 
 

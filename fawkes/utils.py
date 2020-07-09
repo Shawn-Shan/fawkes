@@ -25,7 +25,6 @@ from keras.layers import Dense, Activation
 from keras.models import Model
 from keras.preprocessing import image
 from skimage.transform import resize
-from sklearn.metrics import pairwise_distances
 
 from fawkes.align_face import align, aligner
 from six.moves.urllib.request import urlopen
@@ -422,11 +421,27 @@ def extractor_ls_predict(feature_extractors_ls, X):
     return concated_feature_ls
 
 
+def pairwise_l2_distance(A, B):
+    BT = B.transpose()
+    vecProd = np.dot(A, BT)
+    SqA = A ** 2
+    sumSqA = np.matrix(np.sum(SqA, axis=1))
+    sumSqAEx = np.tile(sumSqA.transpose(), (1, vecProd.shape[1]))
+
+    SqB = B ** 2
+    sumSqB = np.sum(SqB, axis=1)
+    sumSqBEx = np.tile(sumSqB, (vecProd.shape[0], 1))
+    SqED = sumSqBEx + sumSqAEx - 2 * vecProd
+    SqED[SqED < 0] = 0.0
+    ED = np.sqrt(SqED)
+    return ED
+
+
 def calculate_dist_score(a, b, feature_extractors_ls, metric='l2'):
     features1 = extractor_ls_predict(feature_extractors_ls, a)
     features2 = extractor_ls_predict(feature_extractors_ls, b)
 
-    pair_cos = pairwise_distances(features1, features2, metric)
+    pair_cos = pairwise_l2_distance(features1, features2)
     max_sum = np.min(pair_cos, axis=0)
     max_sum_arg = np.argsort(max_sum)[::-1]
     max_sum_arg = max_sum_arg[:len(a)]
@@ -447,7 +462,7 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     embs = [p[1] for p in items]
     embs = np.array(embs)
 
-    pair_dist = pairwise_distances(original_feature_x, embs, metric)
+    pair_dist = pairwise_l2_distance(original_feature_x, embs)
     max_sum = np.min(pair_dist, axis=0)
     max_id = np.argmax(max_sum)
 
