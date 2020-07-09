@@ -70,7 +70,7 @@ def main(*argv):
                         help='GPU id', default='0')
 
     parser.add_argument('--mode', '-m', type=str,
-                        help='cloak generation mode', default='mid')
+                        help='cloak generation mode', default='low')
     parser.add_argument('--feature-extractor', type=str,
                         help="name of the feature extractor used for optimization",
                         default="high_extract")
@@ -95,21 +95,21 @@ def main(*argv):
         args.lr = 20
     elif args.mode == 'mid':
         args.feature_extractor = "high_extract"
-        args.th = 0.004
+        args.th = 0.005
         args.max_step = 50
         args.lr = 15
     elif args.mode == 'high':
         args.feature_extractor = "high_extract"
-        args.th = 0.007
-        args.max_step = 100
-        args.lr = 10
+        args.th = 0.008
+        args.max_step = 500
+        args.lr = 15
     elif args.mode == 'ultra':
         if not tf.test.is_gpu_available():
             print("Please enable GPU for ultra setting...")
             sys.exit(1)
         # args.feature_extractor = ["high_extract", 'high2_extract']
         args.feature_extractor = "high_extract"
-        args.th = 0.015
+        args.th = 0.01
         args.max_step = 2000
         args.lr = 8
     elif args.mode == 'custom':
