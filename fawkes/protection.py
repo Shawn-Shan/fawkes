@@ -4,19 +4,20 @@
 
 import argparse
 import glob
+import logging
 import os
 import random
 import sys
 import time
+
 import tensorflow as tf
-import logging
+
 logging.getLogger('tensorflow').disabled = True
 
 import numpy as np
 from fawkes.differentiator import FawkesMaskGeneration
 from fawkes.utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
     Faces
-
 
 random.seed(12243)
 np.random.seed(122412)
@@ -51,8 +52,88 @@ def check_imgs(imgs):
     return imgs
 
 
+class Fawkes(object):
+    def __init__(self, feature_extractor, gpu, batch_size):
+        self.feature_extractor = feature_extractor
+        self.gpu = gpu
+        self.batch_size = batch_size
+        self.sess = init_gpu(gpu)
+        self.fs_names = [feature_extractor]
+        if isinstance(feature_extractor, list):
+            self.fs_names = feature_extractor
+
+        self.feature_extractors_ls = [load_extractor(name) for name in self.fs_names]
+
+    def mode2param(self, mode):
+        if mode == 'low':
+            th = 0.003
+            max_step = 20
+            lr = 20
+        elif mode == 'mid':
+            th = 0.005
+            max_step = 50
+            lr = 15
+        elif mode == 'high':
+            th = 0.008
+            max_step = 500
+            lr = 15
+        elif mode == 'ultra':
+            if not tf.test.is_gpu_available():
+                print("Please enable GPU for ultra setting...")
+                sys.exit(1)
+            th = 0.01
+            max_step = 2000
+            lr = 8
+        else:
+            raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
+        return th, max_step, lr
+
+    def run_protection(self, image_paths, mode='mid', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
+                       separate_target=True):
+        if mode == 'custom':
+            pass
+        else:
+            th, max_step, lr = self.mode2param(mode)
+
+        start_time = time.time()
+
+        if not image_paths:
+            raise Exception("No images in the directory")
+
+        faces = Faces(image_paths, self.sess, verbose=1)
+
+        orginal_images = faces.cropped_faces
+        orginal_images = np.array(orginal_images)
+
+        if separate_target:
+            target_embedding = []
+            for org_img in orginal_images:
+                org_img = org_img.reshape([1] + list(org_img.shape))
+                tar_emb = select_target_label(org_img, self.feature_extractors_ls, self.fs_names)
+                target_embedding.append(tar_emb)
+            target_embedding = np.concatenate(target_embedding)
+        else:
+            target_embedding = select_target_label(orginal_images, self.feature_extractors_ls, self.fs_names)
+
+        protected_images = generate_cloak_images(self.sess, self.feature_extractors_ls, orginal_images,
+                                                 target_emb=target_embedding, th=th, faces=faces, sd=sd,
+                                                 lr=lr, max_step=max_step, batch_size=batch_size)
+
+        faces.cloaked_cropped_faces = protected_images
+
+        cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(orginal_images)
+        final_images = faces.merge_faces(cloak_perturbation)
+
+        for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
+            file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
+            dump_image(p_img, file_name, format=format)
+
+        elapsed_time = time.time() - start_time
+        print('attack cost %f s' % (elapsed_time))
+        print("Done!")
+
+
 def main(*argv):
-    start_time = time.time()
     if not argv:
         argv = list(sys.argv)
 
@@ -86,85 +167,20 @@ def main(*argv):
     parser.add_argument('--format', type=str,
                         help="final image format",
                         default="png")
-    args = parser.parse_args(argv[1:])
 
-    if args.mode == 'low':
-        args.feature_extractor = "high_extract"
-        args.th = 0.003
-        args.max_step = 20
-        args.lr = 20
-    elif args.mode == 'mid':
-        args.feature_extractor = "high_extract"
-        args.th = 0.005
-        args.max_step = 50
-        args.lr = 15
-    elif args.mode == 'high':
-        args.feature_extractor = "high_extract"
-        args.th = 0.008
-        args.max_step = 500
-        args.lr = 15
-    elif args.mode == 'ultra':
-        if not tf.test.is_gpu_available():
-            print("Please enable GPU for ultra setting...")
-            sys.exit(1)
-        # args.feature_extractor = ["high_extract", 'high2_extract']
-        args.feature_extractor = "high_extract"
-        args.th = 0.01
-        args.max_step = 2000
-        args.lr = 8
-    elif args.mode == 'custom':
-        pass
-    else:
-        raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
+    args = parser.parse_args(argv[1:])
 
     assert args.format in ['png', 'jpg', 'jpeg']
     if args.format == 'jpg':
         args.format = 'jpeg'
 
-    sess = init_gpu(args.gpu)
-
     image_paths = glob.glob(os.path.join(args.directory, "*"))
     image_paths = [path for path in image_paths if "_cloaked" not in path.split("/")[-1]]
-    if not image_paths:
-        raise Exception("No images in the directory")
 
-    faces = Faces(image_paths, sess, verbose=1)
-
-    orginal_images = faces.cropped_faces
-    orginal_images = np.array(orginal_images)
-
-    fs_names = [args.feature_extractor]
-    if isinstance(args.feature_extractor, list):
-        fs_names = args.feature_extractor
-
-    feature_extractors_ls = [load_extractor(name) for name in fs_names]
-
-    if args.separate_target:
-        target_embedding = []
-        for org_img in orginal_images:
-            org_img = org_img.reshape([1] + list(org_img.shape))
-            tar_emb = select_target_label(org_img, feature_extractors_ls, fs_names)
-            target_embedding.append(tar_emb)
-        target_embedding = np.concatenate(target_embedding)
-    else:
-        target_embedding = select_target_label(orginal_images, feature_extractors_ls, fs_names)
-
-    protected_images = generate_cloak_images(sess, feature_extractors_ls, orginal_images,
-                                             target_emb=target_embedding, th=args.th, faces=faces, sd=args.sd,
-                                             lr=args.lr, max_step=args.max_step, batch_size=args.batch_size)
-
-    faces.cloaked_cropped_faces = protected_images
-
-    cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(orginal_images)
-    final_images = faces.merge_faces(cloak_perturbation)
-
-    for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
-        file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), args.mode, args.format)
-        dump_image(p_img, file_name, format=args.format)
-
-    elapsed_time = time.time() - start_time
-    print('attack cost %f s' % (elapsed_time))
-    print("Done!")
+    protector = Fawkes(args.feature_extractor, args.gpu, args.batch_size)
+    protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr, max_step=args.max_step,
+                             batch_size=args.batch_size, format=args.format,
+                             separate_target=args.separate_target)
 
 
 if __name__ == '__main__':
