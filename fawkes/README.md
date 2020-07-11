@@ -17,7 +17,7 @@ If you are a developer or researcher planning to customize and modify on our exi
 
 
 #### PC:
-* Download the binary following this [link]() and unzip the download file. 
+* Download the binary following this [link](http://sandlab.cs.uchicago.edu/fawkes/files/fawkes_binary_windows.zip) and unzip the download file. 
 * Create a directory and move all the images you wish to protect into that directory. Note the path to that directory (e.g. ~/Desktop/images). 
 * Open terminal(powershell or cmd) and change directory to fawkes (the unzipped folder). 
 * Run `protection -d IMAGE_DIR_PATH -m low` to generate cloak for images in `IMAGE_DIR_PATH`. 
