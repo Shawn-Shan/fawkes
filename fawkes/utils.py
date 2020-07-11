@@ -86,7 +86,7 @@ def load_image(path):
 
 
 class Faces(object):
-    def __init__(self, image_paths, sess, verbose=1):
+    def __init__(self, image_paths, aligner, verbose=1):
         model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
         if not os.path.exists(os.path.join(model_dir, "mtcnn.p.gz")):
             os.makedirs(model_dir, exist_ok=True)
@@ -94,7 +94,7 @@ class Faces(object):
                      cache_subdir='')
 
         self.verbose = verbose
-        self.aligner = aligner(sess)
+        self.aligner = aligner
         self.org_faces = []
         self.cropped_faces = []
         self.cropped_faces_shape = []

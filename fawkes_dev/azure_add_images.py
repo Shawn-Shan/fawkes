@@ -14,8 +14,100 @@ data = f.read().split("\n")
 subscription_key = data[0]
 uri_base = data[1]
 
-cloak_image_base = 'http://sandlab.cs.uchicago.edu/fawkes/files/cloak/{}_ultra_cloaked.png'
+cloak_image_base = 'http://sandlab.cs.uchicago.edu/fawkes/files/cloak/{}_high_cloaked.png'
 original_image_base = 'http://sandlab.cs.uchicago.edu/fawkes/files/cloak/{}.png'
+
+
+def test_cloak():
+    NUM_TRAIN = 5
+    total_idx = range(0, 82)
+    TRAIN_RANGE = random.sample(total_idx, NUM_TRAIN)
+
+    TEST_RANGE = random.sample([i for i in total_idx if i not in TRAIN_RANGE], 20)
+
+    personGroupId = 'all'
+
+    # delete_personGroup(personGroupId)
+    # create_personGroupId(personGroupId, personGroupId)
+
+    with open("protect_personId.txt", 'r') as f:
+        protect_personId = f.read()
+    print(protect_personId)
+    delete_personGroupPerson(personGroupId, protect_personId)
+
+    protect_personId = create_personId(personGroupId, 'Emily')
+    with open("protect_personId.txt", 'w') as f:
+        f.write(protect_personId)
+
+    print("Created protect personId: {}".format(protect_personId))
+    for idx in TRAIN_RANGE:
+        image_url = cloak_image_base.format(idx)
+        r = add_persistedFaceId(personGroupId, protect_personId, image_url)
+        if r is not None:
+            print("Added {}".format(idx))
+        else:
+            print("Unable to add {}-th image of protect person".format(idx))
+
+    # add other people
+    # for idx_person in range(5000, 15000):
+    #     personId = create_personId(personGroupId, str(idx_person))
+    #     print("Created personId: {}".format(idx_person))
+    #     for idx_image in range(10):
+    #         image_url = "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(
+    #             idx_person, idx_image)
+    #         r = add_persistedFaceId(personGroupId, personId, image_url)
+    #         if r is not None:
+    #             print("Added {}".format(idx_image))
+    #         else:
+    #             print("Unable to add {}-th image".format(idx_image))
+
+    # train model based on personGroup
+
+    train_personGroup(personGroupId)
+
+    while json.loads(get_trainStatus(personGroupId))['status'] != 'succeeded':
+        time.sleep(2)
+
+    # list_personGroupPerson(personGroupId)
+
+    # test original image
+    idx_range = TEST_RANGE
+    acc = 0.
+    tot = 0.
+    for idx in idx_range:
+        original_image_url = original_image_base.format(idx)
+        faceId = detect_face(original_image_url)
+        if faceId is None:
+            print("{} does not exist".format(idx))
+            continue
+        original_faceIds = [faceId]
+
+        # verify
+        res = eval(original_faceIds, personGroupId, protect_personId)
+        if res:
+            acc += 1.
+        tot += 1.
+
+    acc /= tot
+    print(acc)  # 1.0
+
+
+def list_personGroups():
+    headers = {
+        'Ocp-Apim-Subscription-Key': subscription_key,
+    }
+
+    params = urllib.parse.urlencode({
+    })
+
+    body = json.dumps({})
+
+    conn = http.client.HTTPSConnection(uri_base)
+    conn.request("GET", "/face/v1.0/persongroups?%s" % params, body, headers)
+    response = conn.getresponse()
+    data = response.read()
+    print(data)
+    conn.close()
 
 
 def detect_face(image_url):
@@ -272,98 +364,6 @@ def get_trainStatus(personGroupId):
     data = response.read()
     conn.close()
     return data
-
-
-def test_cloak():
-    NUM_TRAIN = 10
-    total_idx = range(0, 82)
-    TRAIN_RANGE = random.sample(total_idx, NUM_TRAIN)
-
-    TEST_RANGE = random.sample([i for i in total_idx if i not in TRAIN_RANGE], 20)
-
-    personGroupId = 'all'
-
-    # delete_personGroup(personGroupId)
-    # create_personGroupId(personGroupId, personGroupId)
-
-    with open("protect_personId.txt", 'r') as f:
-        protect_personId = f.read()
-    print(protect_personId)
-    delete_personGroupPerson(personGroupId, protect_personId)
-
-    protect_personId = create_personId(personGroupId, 'Emily')
-    with open("protect_personId.txt", 'w') as f:
-        f.write(protect_personId)
-
-    print("Created protect personId: {}".format(protect_personId))
-    for idx in TRAIN_RANGE:
-        image_url = cloak_image_base.format(idx)
-        r = add_persistedFaceId(personGroupId, protect_personId, image_url)
-        if r is not None:
-            print("Added {}".format(idx))
-        else:
-            print("Unable to add {}-th image of protect person".format(idx))
-
-    # add other people
-    # for idx_person in range(1300, 5000):
-    #     personId = create_personId(personGroupId, str(idx_person))
-    #     print("Created personId: {}".format(idx_person))
-    #     for idx_image in range(10):
-    #         image_url = "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(
-    #             idx_person, idx_image)
-    #         r = add_persistedFaceId(personGroupId, personId, image_url)
-    #         if r is not None:
-    #             print("Added {}".format(idx_image))
-    #         else:
-    #             print("Unable to add {}-th image".format(idx_image))
-
-    # train model based on personGroup
-
-    train_personGroup(personGroupId)
-
-    while json.loads(get_trainStatus(personGroupId))['status'] != 'succeeded':
-        time.sleep(2)
-
-    # list_personGroupPerson(personGroupId)
-
-    # test original image
-    idx_range = TEST_RANGE
-    acc = 0.
-    tot = 0.
-    for idx in idx_range:
-        original_image_url = original_image_base.format(idx)
-        faceId = detect_face(original_image_url)
-        if faceId is None:
-            print("{} does not exist".format(idx))
-            continue
-        original_faceIds = [faceId]
-
-        # verify
-        res = eval(original_faceIds, personGroupId, protect_personId)
-        if res:
-            acc += 1.
-        tot += 1.
-
-    acc /= tot
-    print(acc)  # 1.0
-
-
-def list_personGroups():
-    headers = {
-        'Ocp-Apim-Subscription-Key': subscription_key,
-    }
-
-    params = urllib.parse.urlencode({
-    })
-
-    body = json.dumps({})
-
-    conn = http.client.HTTPSConnection(uri_base)
-    conn.request("GET", "/face/v1.0/persongroups?%s" % params, body, headers)
-    response = conn.getresponse()
-    data = response.read()
-    print(data)
-    conn.close()
 
 
 def delete_personGroup(personGroupId):

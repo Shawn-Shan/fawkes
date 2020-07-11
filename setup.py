@@ -82,7 +82,6 @@ install_requires = [
     'keras==2.2.5',
     'scikit-image',
     'pillow>=7.0.0',
-    'opencv-python>=4.2.0.34'
 ]
 
 setup(

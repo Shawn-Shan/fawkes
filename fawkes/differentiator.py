@@ -405,9 +405,9 @@ class FawkesMaskGeneration:
                 if all_clear:
                     break
 
-                # if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
-                    # LR = LR / 2
-                    # print("Learning Rate: ", LR)
+                if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
+                    LR = LR * 0.8
+                    print("Learning Rate: ", LR)
 
                 if iteration % (self.MAX_ITERATIONS // 5) == 0:
                     if self.verbose == 1:

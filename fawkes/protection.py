@@ -18,7 +18,7 @@ import numpy as np
 from fawkes.differentiator import FawkesMaskGeneration
 from fawkes.utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
     Faces
-
+from fawkes.align_face import aligner
 random.seed(12243)
 np.random.seed(122412)
 
@@ -54,10 +54,14 @@ def check_imgs(imgs):
 
 class Fawkes(object):
     def __init__(self, feature_extractor, gpu, batch_size):
+        global graph
+        graph = tf.get_default_graph()
+
         self.feature_extractor = feature_extractor
         self.gpu = gpu
         self.batch_size = batch_size
         self.sess = init_gpu(gpu)
+        self.aligner = aligner(self.sess)
         self.fs_names = [feature_extractor]
         if isinstance(feature_extractor, list):
             self.fs_names = feature_extractor
@@ -67,23 +71,23 @@ class Fawkes(object):
     def mode2param(self, mode):
         if mode == 'low':
             th = 0.003
-            max_step = 20
+            max_step = 50
             lr = 20
         elif mode == 'mid':
             th = 0.005
-            max_step = 50
-            lr = 15
+            max_step = 100
+            lr = 30
         elif mode == 'high':
             th = 0.008
-            max_step = 500
-            lr = 15
+            max_step = 200
+            lr = 20
         elif mode == 'ultra':
             if not tf.test.is_gpu_available():
                 print("Please enable GPU for ultra setting...")
                 sys.exit(1)
             th = 0.01
-            max_step = 2000
-            lr = 8
+            max_step = 200
+            lr = 20
         else:
             raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
         return th, max_step, lr
@@ -99,38 +103,38 @@ class Fawkes(object):
 
         if not image_paths:
             raise Exception("No images in the directory")
+        with graph.as_default():
+            faces = Faces(image_paths, self.aligner, verbose=1)
 
-        faces = Faces(image_paths, self.sess, verbose=1)
+            original_images = faces.cropped_faces
+            original_images = np.array(original_images)
 
-        original_images = faces.cropped_faces
-        original_images = np.array(original_images)
+            if separate_target:
+                target_embedding = []
+                for org_img in original_images:
+                    org_img = org_img.reshape([1] + list(org_img.shape))
+                    tar_emb = select_target_label(org_img, self.feature_extractors_ls, self.fs_names)
+                    target_embedding.append(tar_emb)
+                target_embedding = np.concatenate(target_embedding)
+            else:
+                target_embedding = select_target_label(original_images, self.feature_extractors_ls, self.fs_names)
 
-        if separate_target:
-            target_embedding = []
-            for org_img in original_images:
-                org_img = org_img.reshape([1] + list(org_img.shape))
-                tar_emb = select_target_label(org_img, self.feature_extractors_ls, self.fs_names)
-                target_embedding.append(tar_emb)
-            target_embedding = np.concatenate(target_embedding)
-        else:
-            target_embedding = select_target_label(original_images, self.feature_extractors_ls, self.fs_names)
+            protected_images = generate_cloak_images(self.sess, self.feature_extractors_ls, original_images,
+                                                     target_emb=target_embedding, th=th, faces=faces, sd=sd,
+                                                     lr=lr, max_step=max_step, batch_size=batch_size)
 
-        protected_images = generate_cloak_images(self.sess, self.feature_extractors_ls, original_images,
-                                                 target_emb=target_embedding, th=th, faces=faces, sd=sd,
-                                                 lr=lr, max_step=max_step, batch_size=batch_size)
+            faces.cloaked_cropped_faces = protected_images
 
-        faces.cloaked_cropped_faces = protected_images
+            cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(original_images)
+            final_images = faces.merge_faces(cloak_perturbation)
 
-        cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(original_images)
-        final_images = faces.merge_faces(cloak_perturbation)
+            for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
+                file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
+                dump_image(p_img, file_name, format=format)
 
-        for p_img, cloaked_img, path in zip(final_images, protected_images, image_paths):
-            file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
-            dump_image(p_img, file_name, format=format)
-
-        elapsed_time = time.time() - start_time
-        print('attack cost %f s' % elapsed_time)
-        print("Done!")
+            elapsed_time = time.time() - start_time
+            print('attack cost %f s' % elapsed_time)
+            print("Done!")
 
 
 def main(*argv):
