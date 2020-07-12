@@ -8,7 +8,6 @@ import shutil
 import sys
 import tarfile
 import zipfile
-
 import six
 from six.moves.urllib.error import HTTPError, URLError
 
@@ -21,7 +20,7 @@ import keras.backend as K
 import numpy as np
 import tensorflow as tf
 from PIL import Image, ExifTags
-from keras.layers import Dense, Activation
+from keras.layers import Dense, Activation, Dropout
 from keras.models import Model
 from keras.preprocessing import image
 from skimage.transform import resize
@@ -63,7 +62,9 @@ def clip_img(X, preprocessing='raw'):
 
 
 def load_image(path):
+
     img = Image.open(path)
+
     if img._getexif() is not None:
         for orientation in ExifTags.TAGS.keys():
             if ExifTags.TAGS[orientation] == 'Orientation':
@@ -184,10 +185,12 @@ def fix_gpu_memory(mem_fraction=1):
     return sess
 
 
-def load_victim_model(number_classes, teacher_model=None, end2end=False):
+def load_victim_model(number_classes, teacher_model=None, end2end=False, dropout=0):
     for l in teacher_model.layers:
         l.trainable = end2end
     x = teacher_model.layers[-1].output
+    if dropout > 0:
+        x = Dropout(dropout)(x)
     x = Dense(number_classes)(x)
     x = Activation('softmax', name="act")(x)
     model = Model(teacher_model.input, x)
