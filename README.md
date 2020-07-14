@@ -38,7 +38,10 @@ when --mode is `custom`:
 - Select the best mode for your need. `Low` protection is effective against most model trained by individual trackers with commodity face recongition model. `mid` is robust against most commercial models, such as Facebook tagging system. `high` is robust against powerful modeled trained using different face recongition API. 
 - The perturbation generation takes ~60 seconds per image on a CPU machine, and it would be much faster on a GPU machine. Use `batch-size=1` on CPU and `batch-size>1` on GPUs. 
 - Turn on separate target if the images in the directory belong to different person, otherwise, turn it off. 
-- How do I know my images are secure? We offer two ways to test the robustness of our detection and both of which requires certain level of coding experience. More details please checkout in [evaluation](https://github.com/Shawn-Shan/fawkes/tree/master/evaluation) directory. 
+
+### How do I know my images are secure? 
+
+We offer two ways to test the robustness of our detection and both of which requires certain level of coding experience. More details please checkout in [evaluation](https://github.com/Shawn-Shan/fawkes/tree/master/evaluation) directory. 
 
 
 Quick Installation
