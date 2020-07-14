@@ -162,6 +162,7 @@ def main():
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
+
     parser.add_argument('--gpu', type=str,
                         help='GPU id', default='0')
 
