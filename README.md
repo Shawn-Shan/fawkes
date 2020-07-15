@@ -43,6 +43,7 @@ when --mode is `custom`:
 - Select the best mode for your need. `Low` protection is effective against most model trained by individual trackers with commodity face recongition model. `mid` is robust against most commercial models, such as Facebook tagging system. `high` is robust against powerful modeled trained using different face recongition API. 
 - The perturbation generation takes ~60 seconds per image on a CPU machine, and it would be much faster on a GPU machine. Use `batch-size=1` on CPU and `batch-size>1` on GPUs. 
 - Turn on separate target if the images in the directory belong to different person, otherwise, turn it off. 
+- Run on GPU. The current fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run fawkes by `python3 fawkes/protection.py [args]`. 
 
 ### How do I know my images are secure? 
 
