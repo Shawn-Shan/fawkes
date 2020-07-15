@@ -8,6 +8,11 @@ We published an academic paper to summary our work "[Fawkes: Protecting Personal
 If you would like to use Fawkes to protect your images, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
 
 
+Copyright
+---------
+This code is only for personal privacy protection or academic research. 
+
+We are currently exploring the filing of a provisional patent on the Fawkes algorithm. 
 
 Usage
 -----
