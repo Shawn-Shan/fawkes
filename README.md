@@ -10,7 +10,7 @@ If you would like to use Fawkes to protect your images, please check out our bin
 
 Copyright
 ---------
-This code is only for personal privacy protection or academic research. 
+This code is intended only for personal privacy protection or academic research. 
 
 We are currently exploring the filing of a provisional patent on the Fawkes algorithm. 
 
