@@ -1,7 +1,7 @@
 Fawkes
 ------
 
-Fawkes is a privacy protection system developed by researchers at [SANDLab](http://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](http://sandlab.cs.uchicago.edu/fawkes/).  
+Fawkes is a privacy protection system developed by researchers at [SANDLab](http://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](http://sandlab.cs.uchicago.edu/fawkes/). Contact as at fawkes-team@googlegroups.com. 
 
 We published an academic paper to summary our work "[Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models](https://www.shawnshan.com/files/publication/fawkes.pdf)" at *USENIX Security 2020*. 
 
@@ -10,7 +10,7 @@ If you would like to use Fawkes to protect your images, please check out our bin
 
 Copyright
 ---------
-This code is only for personal privacy protection or academic research. 
+This code is intended only for personal privacy protection or academic research. 
 
 We are currently exploring the filing of a provisional patent on the Fawkes algorithm. 
 
