@@ -55,7 +55,6 @@ if sys.version_info[0] == 2:
 else:
     from six.moves.urllib.request import urlretrieve
 
-
 def clip_img(X, preprocessing='raw'):
     X = reverse_preprocess(X, preprocessing)
     X = np.clip(X, 0.0, 255.0)
@@ -92,11 +91,6 @@ def load_image(path):
 
 class Faces(object):
     def __init__(self, image_paths, aligner, verbose=1, eval_local=False):
-        model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
-        if not os.path.exists(os.path.join(model_dir, "mtcnn.p.gz")):
-            os.makedirs(model_dir, exist_ok=True)
-            get_file("mtcnn.p.gz", "http://sandlab.cs.uchicago.edu/fawkes/files/mtcnn.p.gz", cache_dir=model_dir,
-                     cache_subdir='')
 
         self.verbose = verbose
         self.aligner = aligner
@@ -366,13 +360,6 @@ def load_extractor(name):
     if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
         raise Exception(
             "Given extractor's last layer is softmax, need to remove the top layers to make it into a feature extractor")
-    # if "extract" in name.split("/")[-1]:
-    #     pass
-    # else:
-    #     print("Convert a model to a feature extractor")
-    #     model = build_bottleneck_model(model, model.layers[layer_idx].name)
-    #     model.save(name + "extract")
-    #     model = keras.models.load_model(name + "extract")
     return model
 
 
@@ -524,13 +511,13 @@ def get_file(fname,
              archive_format='auto',
              cache_dir=None):
     if cache_dir is None:
-        cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
+        cache_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
     if md5_hash is not None and file_hash is None:
         file_hash = md5_hash
         hash_algorithm = 'md5'
     datadir_base = os.path.expanduser(cache_dir)
     if not os.access(datadir_base, os.W_OK):
-        datadir_base = os.path.join('/tmp', '.keras')
+        datadir_base = os.path.join('/tmp', '.fawkes')
     datadir = os.path.join(datadir_base, cache_subdir)
     _makedirs_exist_ok(datadir)
 

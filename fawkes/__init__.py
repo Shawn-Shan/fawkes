@@ -4,7 +4,7 @@
 # @Link    : https://www.shawnshan.com/
 
 
-__version__ = '0.0.6'
+__version__ = '0.0.8'
 
 from .detect_faces import create_mtcnn, run_detect_face
 from .differentiator import FawkesMaskGeneration

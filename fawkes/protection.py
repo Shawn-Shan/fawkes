@@ -19,6 +19,7 @@ from fawkes.differentiator import FawkesMaskGeneration
 from fawkes.utils import load_extractor, init_gpu, select_target_label, dump_image, reverse_process_cloaked, \
     Faces
 from fawkes.align_face import aligner
+from fawkes.utils import get_file
 random.seed(12243)
 np.random.seed(122412)
 
@@ -61,6 +62,13 @@ class Fawkes(object):
         self.gpu = gpu
         self.batch_size = batch_size
         self.sess = init_gpu(gpu)
+
+        model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+        if not os.path.exists(os.path.join(model_dir, "mtcnn.p.gz")):
+            os.makedirs(model_dir, exist_ok=True)
+            get_file("mtcnn.p.gz", "http://sandlab.cs.uchicago.edu/fawkes/files/mtcnn.p.gz", cache_dir=model_dir,
+                     cache_subdir='')
+
         self.aligner = aligner(self.sess)
         self.fs_names = [feature_extractor]
         if isinstance(feature_extractor, list):
@@ -76,7 +84,7 @@ class Fawkes(object):
         elif mode == 'mid':
             th = 0.005
             max_step = 100
-            lr = 30
+            lr = 20
         elif mode == 'high':
             th = 0.008
             max_step = 200
