@@ -113,8 +113,6 @@ class Fawkes(object):
 
         image_paths, loaded_images = filter_image_paths(image_paths)
 
-        start_time = time.time()
-
         if not image_paths:
             raise Exception("No images in the directory")
         with graph.as_default():
