@@ -55,6 +55,7 @@ if sys.version_info[0] == 2:
 else:
     from six.moves.urllib.request import urlretrieve
 
+
 def clip_img(X, preprocessing='raw'):
     X = reverse_preprocess(X, preprocessing)
     X = np.clip(X, 0.0, 255.0)
@@ -66,6 +67,8 @@ def load_image(path):
     try:
         img = Image.open(path)
     except PIL.UnidentifiedImageError:
+        return None
+    except IsADirectoryError:
         return None
 
     if img._getexif() is not None:
@@ -89,9 +92,24 @@ def load_image(path):
     return image_array
 
 
-class Faces(object):
-    def __init__(self, image_paths, aligner, verbose=1, eval_local=False):
+def filter_image_paths(image_paths):
+    print("Identify {} files in the directory".format(len(image_paths)))
+    new_image_paths = []
+    new_images = []
+    for p in image_paths:
+        img = load_image(p)
+        if img is None:
+            print("{} is not an image file, skipped".format(p.split("/")[-1]))
+            continue
+        new_image_paths.append(p)
+        new_images.append(img)
+    print("Identify {} images in the directory".format(len(new_image_paths)))
+    return new_image_paths, new_images
 
+
+class Faces(object):
+    def __init__(self, image_paths, loaded_images, aligner, verbose=1, eval_local=False):
+        self.image_paths = image_paths
         self.verbose = verbose
         self.aligner = aligner
         self.org_faces = []
@@ -99,12 +117,9 @@ class Faces(object):
         self.cropped_faces_shape = []
         self.cropped_index = []
         self.callback_idx = []
-        if verbose:
-            print("Identify {} images".format(len(image_paths)))
-        for i, p in enumerate(image_paths):
-            cur_img = load_image(p)
-            if cur_img is None:
-                continue
+        for i in range(0, len(loaded_images)):
+            cur_img = loaded_images[i]
+            p = image_paths[i]
 
             self.org_faces.append(cur_img)
 
@@ -115,7 +130,7 @@ class Faces(object):
             align_img = align(cur_img, self.aligner, margin=margin)
 
             if align_img is None:
-                print("Find 0 face(s) in {}".format(p.split("/")[-1]))
+                print("Find 0 face(s)".format(p.split("/")[-1]))
                 continue
 
             cur_faces = align_img[0]
@@ -143,8 +158,7 @@ class Faces(object):
             self.callback_idx.extend([i] * len(cur_faces_square))
 
         if not self.cropped_faces:
-            print("No faces detected")
-            exit(1)
+            raise Exception("No faces detected")
 
         self.cropped_faces = np.array(self.cropped_faces)
 
@@ -469,8 +483,11 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     embs = np.array(embs)
 
     pair_dist = pairwise_l2_distance(original_feature_x, embs)
+    pair_dist = np.array(pair_dist)
+
     max_sum = np.min(pair_dist, axis=0)
-    max_id = np.argmax(max_sum)
+    max_id_ls = np.argsort(max_sum)[::-1]
+    max_id = random.choice(max_id_ls[:20])
 
     target_data_id = paths[int(max_id)]
     image_dir = os.path.join(model_dir, "target_data/{}".format(target_data_id))
@@ -480,9 +497,12 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     for i in range(10):
         if os.path.exists(os.path.join(model_dir, "target_data/{}/{}.jpg".format(target_data_id, i))):
             continue
-        get_file("{}.jpg".format(i),
-                 "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
-                 cache_dir=model_dir, cache_subdir='target_data/{}/'.format(target_data_id))
+        try:
+            get_file("{}.jpg".format(i),
+                     "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
+                     cache_dir=model_dir, cache_subdir='target_data/{}/'.format(target_data_id))
+        except Exception:
+            pass
 
     image_paths = glob.glob(image_dir + "/*.jpg")
 

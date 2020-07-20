@@ -10,8 +10,8 @@ from decimal import Decimal
 
 import numpy as np
 import tensorflow as tf
-
 from fawkes.utils import preprocess, reverse_preprocess
+from keras.utils import Progbar
 
 
 class FawkesMaskGeneration:
@@ -226,8 +226,6 @@ class FawkesMaskGeneration:
 
         self.init = tf.variables_initializer(var_list=[self.modifier] + new_vars)
 
-        print('Attacker loaded')
-
     def preprocess_arctanh(self, imgs):
 
         imgs = reverse_preprocess(imgs, self.intensity_range)
@@ -276,7 +274,7 @@ class FawkesMaskGeneration:
             adv_imgs.extend(adv_img)
 
         elapsed_time = time.time() - start_time
-        print('attack cost %f s' % (elapsed_time))
+        print('protection cost %f s' % (elapsed_time))
 
         return np.array(adv_imgs)
 
@@ -356,84 +354,70 @@ class FawkesMaskGeneration:
                      bottlesim_sum / nb_imgs))
 
         finished_idx = set()
-        try:
-            total_distance = [0] * nb_imgs
+        total_distance = [0] * nb_imgs
 
-            if self.limit_dist:
-                dist_raw_list, bottlesim_list, aimg_input_list = self.sess.run(
-                    [self.dist_raw,
-                     self.bottlesim,
-                     self.aimg_input])
-                for e, (dist_raw, bottlesim, aimg_input) in enumerate(
-                        zip(dist_raw_list, bottlesim_list, aimg_input_list)):
-                    if e >= nb_imgs:
-                        break
-                    total_distance[e] = bottlesim
-
-            for iteration in range(self.MAX_ITERATIONS):
-
-                self.sess.run([self.train], feed_dict={self.learning_rate_holder: LR})
-
-                dist_raw_list, bottlesim_list, aimg_input_list = self.sess.run(
-                    [self.dist_raw,
-                     self.bottlesim,
-                     self.aimg_input])
-
-                all_clear = True
-                for e, (dist_raw, bottlesim, aimg_input) in enumerate(
-                        zip(dist_raw_list, bottlesim_list, aimg_input_list)):
-
-                    if e in finished_idx:
-                        continue
-
-                    if e >= nb_imgs:
-                        break
-                    if (bottlesim < best_bottlesim[e] and bottlesim > total_distance[e] * 0.1 and (
-                            not self.maximize)) or (
-                            bottlesim > best_bottlesim[e] and self.maximize):
-                        best_bottlesim[e] = bottlesim
-                        best_adv[e] = aimg_input
-
-                    # if iteration > 20 and (dist_raw >= self.l_threshold or iteration == self.MAX_ITERATIONS - 1):
-                    #     finished_idx.add(e)
-                    #     print("{} finished at dist {}".format(e, dist_raw))
-                    #     best_bottlesim[e] = bottlesim
-                    #     best_adv[e] = aimg_input
-                    #
-                    all_clear = False
-
-                if all_clear:
+        if self.limit_dist:
+            dist_raw_list, bottlesim_list, aimg_input_list = self.sess.run(
+                [self.dist_raw,
+                 self.bottlesim,
+                 self.aimg_input])
+            for e, (dist_raw, bottlesim, aimg_input) in enumerate(
+                    zip(dist_raw_list, bottlesim_list, aimg_input_list)):
+                if e >= nb_imgs:
                     break
+                total_distance[e] = bottlesim
 
-                if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
-                    LR = LR * 0.8
-                    print("Learning Rate: ", LR)
+        if self.verbose == 0:
+            progressbar = Progbar(
+                self.MAX_ITERATIONS, width=30, verbose=1
+            )
 
-                if iteration % (self.MAX_ITERATIONS // 5) == 0:
-                    if self.verbose == 1:
-                        dist_raw_sum = float(self.sess.run(self.dist_raw_sum))
-                        bottlesim_sum = self.sess.run(self.bottlesim_sum)
-                        print('ITER %4d perturb: %.5f; sim: %f'
-                              % (iteration, dist_raw_sum / nb_imgs, bottlesim_sum / nb_imgs))
+        for iteration in range(self.MAX_ITERATIONS):
 
-                        # protected_images = aimg_input_list
-                        #
-                        # orginal_images = np.copy(self.faces.cropped_faces)
-                        # cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(
-                        #     orginal_images)
-                        # final_images = self.faces.merge_faces(cloak_perturbation)
-                        #
-                        # for p_img, img in zip(protected_images, final_images):
-                        #     dump_image(reverse_process_cloaked(p_img),
-                        #                "/home/shansixioing/fawkes/data/emily/emily_cloaked_cropped{}.png".format(iteration),
-                        #                format='png')
-                        #
-                        #     dump_image(img,
-                        #                "/home/shansixioing/fawkes/data/emily/emily_cloaked_{}.png".format(iteration),
-                        #                format='png')
+            self.sess.run([self.train], feed_dict={self.learning_rate_holder: LR})
 
-        except KeyboardInterrupt:
-            pass
+            dist_raw_list, bottlesim_list, aimg_input_list = self.sess.run(
+                [self.dist_raw,
+                 self.bottlesim,
+                 self.aimg_input])
+
+            all_clear = True
+            for e, (dist_raw, bottlesim, aimg_input) in enumerate(
+                    zip(dist_raw_list, bottlesim_list, aimg_input_list)):
+
+                if e in finished_idx:
+                    continue
+
+                if e >= nb_imgs:
+                    break
+                if (bottlesim < best_bottlesim[e] and bottlesim > total_distance[e] * 0.1 and (
+                        not self.maximize)) or (
+                        bottlesim > best_bottlesim[e] and self.maximize):
+                    best_bottlesim[e] = bottlesim
+                    best_adv[e] = aimg_input
+
+                # if iteration > 20 and (dist_raw >= self.l_threshold or iteration == self.MAX_ITERATIONS - 1):
+                #     finished_idx.add(e)
+                #     print("{} finished at dist {}".format(e, dist_raw))
+                #     best_bottlesim[e] = bottlesim
+                #     best_adv[e] = aimg_input
+                #
+                all_clear = False
+
+            if all_clear:
+                break
+
+            if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
+                LR = LR * 0.8
+
+            if iteration % (self.MAX_ITERATIONS // 5) == 0:
+                if self.verbose == 1:
+                    dist_raw_sum = float(self.sess.run(self.dist_raw_sum))
+                    bottlesim_sum = self.sess.run(self.bottlesim_sum)
+                    print('ITER %4d perturb: %.5f; sim: %f'
+                          % (iteration, dist_raw_sum / nb_imgs, bottlesim_sum / nb_imgs))
+            if self.verbose == 0:
+                progressbar.update(iteration)
 
         if self.verbose == 1:
             loss_sum = float(self.sess.run(self.loss_sum))
@@ -445,7 +429,6 @@ class FawkesMaskGeneration:
                      dist_sum,
                      dist_raw_sum,
                      bottlesim_sum / nb_imgs))
-
+        print("\n")
         best_adv = self.clipping(best_adv[:nb_imgs])
-
         return best_adv
