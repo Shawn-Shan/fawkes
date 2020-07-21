@@ -8,7 +8,7 @@ import keras
 import numpy as np
 
 random.seed(1000)
-from fawkes.utils import init_gpu, load_extractor, load_victim_model, get_file, preprocess, Faces
+from fawkes.utils import init_gpu, load_extractor, load_victim_model, get_file, preprocess, Faces, filter_image_paths
 from keras.preprocessing import image
 from keras.utils import to_categorical
 from fawkes.align_face import aligner
@@ -115,7 +115,6 @@ class CallbackGenerator(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         _, original_acc = self.model.evaluate(self.original_imgs, self.original_y, verbose=0)
-
         print("Epoch: {} - Protection Success Rate {:.4f}".format(epoch, 1 - original_acc))
 
 
@@ -124,16 +123,22 @@ def main():
     ali = aligner(sess)
     print("Build attacker's model")
     image_paths = glob.glob(os.path.join(args.directory, "*"))
-    cloak_file_name = "low_cloaked"
-    original_image_paths = sorted([path for path in image_paths if "cloaked" not in path.split("/")[-1]])
-    protect_image_paths = sorted([path for path in image_paths if cloak_file_name in path.split("/")[-1]])
+    cloak_file_name = "_cloaked"
 
-    original_faces = Faces(original_image_paths, ali, verbose=1, eval_local=True)
+    original_image_paths = sorted([path for path in image_paths if "cloaked" not in path.split("/")[-1]])
+    original_image_paths, original_loaded_images = filter_image_paths(original_image_paths)
+
+    protect_image_paths = sorted([path for path in image_paths if cloak_file_name in path.split("/")[-1]])
+    protect_image_paths, protected_loaded_images = filter_image_paths(protect_image_paths)
+
+    print("Find {} original image and {} cloaked images".format(len(original_image_paths), len(protect_image_paths)))
+
+    original_faces = Faces(original_image_paths, original_loaded_images, ali, verbose=1, eval_local=True)
     original_faces = original_faces.cropped_faces
-    cloaked_faces = Faces(protect_image_paths, ali, verbose=1, eval_local=True)
+    cloaked_faces = Faces(protect_image_paths, protected_loaded_images, ali, verbose=1, eval_local=True)
     cloaked_faces = cloaked_faces.cropped_faces
 
-    if len(original_faces) <= 10:
+    if len(original_faces) <= 10 or len(protect_image_paths) <= 10:
         raise Exception("Must have more than 10 protected images to run the evaluation")
 
     num_classes = args.num_other_classes + 1
@@ -152,7 +157,7 @@ def main():
 
     model.fit_generator(train_generator, steps_per_epoch=num_classes * 10 // 32,
                         epochs=args.n_epochs,
-                        verbose=2,
+                        verbose=1,
                         callbacks=[cb]
                         )
 
@@ -169,7 +174,7 @@ def parse_arguments(argv):
     parser.add_argument('--dataset', type=str,
                         help='name of dataset', default='scrub')
     parser.add_argument('--num_other_classes', type=int,
-                        help='name of dataset', default=1000)
+                        help='name of dataset', default=500)
 
     parser.add_argument('--directory', '-d', type=str,
                         help='name of the cloak result directory', required=True)
