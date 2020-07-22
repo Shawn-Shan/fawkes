@@ -1,10 +1,9 @@
 import threading
+from tkinter import Tk, BOTH, StringVar
+from tkinter.filedialog import askopenfilenames
+from tkinter.ttk import Frame, Label, Button
 
 import fawkes.protection
-
-from tkinter import Tk, BOTH, StringVar
-from tkinter.ttk import Frame, Label, Style, Button
-from tkinter.filedialog import askdirectory, askopenfilenames
 
 
 class UI(Frame):
