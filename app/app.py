@@ -1,3 +1,7 @@
+'''
+Simple GUI to facilitate interaction with Fawkes.
+'''
+
 import threading
 from tkinter import Tk, BOTH, StringVar
 from tkinter.filedialog import askopenfilenames
