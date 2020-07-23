@@ -141,6 +141,9 @@ class Faces(object):
             if verbose:
                 print("Find {} face(s) in {}".format(len(cur_faces), p.split("/")[-1]))
 
+            if eval_local:
+                cur_faces = cur_faces[:1]
+
             for img in cur_faces:
                 if eval_local:
                     base = resize(img, (224, 224))
@@ -149,6 +152,7 @@ class Faces(object):
                     base = np.zeros((long_size, long_size, 3))
                     base[0:img.shape[0], 0:img.shape[1], :] = img
                 cur_faces_square.append(base)
+
 
             cur_index = align_img[1]
             cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]

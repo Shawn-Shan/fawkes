@@ -48,7 +48,7 @@ class FawkesMaskGeneration:
                  max_iterations=MAX_ITERATIONS, initial_const=INITIAL_CONST,
                  intensity_range=INTENSITY_RANGE, l_threshold=L_THRESHOLD,
                  max_val=MAX_VAL, keep_final=KEEP_FINAL, maximize=MAXIMIZE, image_shape=IMAGE_SHAPE,
-                 verbose=0, ratio=RATIO, limit_dist=LIMIT_DIST, faces=None):
+                 verbose=0, ratio=RATIO, limit_dist=LIMIT_DIST):
 
         assert intensity_range in {'raw', 'imagenet', 'inception', 'mnist'}
 
@@ -70,7 +70,6 @@ class FawkesMaskGeneration:
         self.ratio = ratio
         self.limit_dist = limit_dist
         self.single_shape = list(image_shape)
-        self.faces = faces
 
         self.input_shape = tuple([self.batch_size] + self.single_shape)
 
@@ -168,7 +167,8 @@ class FawkesMaskGeneration:
         self.bottlesim_sum = 0.0
         self.bottlesim_push = 0.0
         for bottleneck_model in bottleneck_model_ls:
-            model_input_shape = bottleneck_model.input_shape[1:]
+            model_input_shape = (224, 224, 3)
+
             cur_aimg_input = resize_tensor(self.aimg_input, model_input_shape)
 
             self.bottleneck_a = bottleneck_model(cur_aimg_input)
@@ -267,7 +267,7 @@ class FawkesMaskGeneration:
               % int(np.ceil(len(source_imgs) / self.batch_size)))
 
         for idx in range(0, len(source_imgs), self.batch_size):
-            print('processing batch %d at %s' % (idx, datetime.datetime.now()))
+            print('processing image %d at %s' % (idx+1, datetime.datetime.now()))
             adv_img = self.attack_batch(source_imgs[idx:idx + self.batch_size],
                                         target_imgs[idx:idx + self.batch_size],
                                         weights[idx:idx + self.batch_size])
@@ -314,8 +314,6 @@ class FawkesMaskGeneration:
         timg_tanh_batch[:nb_imgs] = timg_tanh[:nb_imgs]
         weights_batch[:nb_imgs] = weights[:nb_imgs]
         modifier_batch = np.ones(self.input_shape) * 1e-6
-
-        temp_images = []
 
         # set the variables so that we don't have to send them over again
         if self.MIMIC_IMG:
@@ -407,8 +405,9 @@ class FawkesMaskGeneration:
             if all_clear:
                 break
 
-            if iteration != 0 and iteration % (self.MAX_ITERATIONS // 2) == 0:
+            if iteration != 0 and iteration % (self.MAX_ITERATIONS // 3) == 0:
                 LR = LR * 0.8
+                print("LR: {}".format(LR))
 
             if iteration % (self.MAX_ITERATIONS // 5) == 0:
                 if self.verbose == 1:

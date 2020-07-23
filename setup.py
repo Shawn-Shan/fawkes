@@ -77,7 +77,7 @@ setup_requires = []
 install_requires = [
     'numpy==1.16.4',
     # 'tensorflow-gpu>=1.13.1, <=1.14.0',
-    'tensorflow>=1.12.0, <=1.15.0',
+    'tensorflow>=1.12.0, <=1.15.0', # change this is tensorflow-gpu if using GPU machine. 
     'argparse',
     'keras>=2.2.5, <=2.3.1',
     'scikit-image',
@@ -88,7 +88,7 @@ install_requires = [
 setup(
     name='fawkes',
     version=__version__,
-    license='MIT',
+    license='BSD',
     description='An utility to protect user privacy',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -114,5 +114,5 @@ setup(
     },
     include_package_data=True,
     zip_safe=False,
-    python_requires='>=3.5',
+    python_requires='>=3.5,<3.8',
 )
