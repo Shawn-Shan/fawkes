@@ -44,9 +44,7 @@ when --mode is `custom`:
 - Run on GPU. The current fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run fawkes by `python3 fawkes/protection.py [args]`. 
 
 ### How do I know my images are secure? 
-
-We offer two ways to test the robustness of our detection and both of which requires certain level of coding experience. More details please checkout in [evaluation](https://github.com/Shawn-Shan/fawkes/tree/master/evaluation) directory. 
-
+We are actively working on this. Python script that can test the protection effectiveness will be ready shortly. 
 
 Quick Installation
 ------------------
