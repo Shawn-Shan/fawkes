@@ -5,7 +5,7 @@ Fawkes is a privacy protection system developed by researchers at [SANDLab](http
 
 We published an academic paper to summarize our work "[Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models](https://www.shawnshan.com/files/publication/fawkes.pdf)" at *USENIX Security 2020*. 
 
-If you would like to use Fawkes to protect your images, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
+If you would like to use Fawkes to protect your identity, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
 
 
 Copyright
@@ -39,8 +39,6 @@ when --mode is `custom`:
 `fawkes -d ./imgs --mode mid`
 
 ### Tips
-
-- Select the best mode for your need. `Low` protection is effective against most model trained by individual trackers with commodity face recongition model. `mid` is robust against most commercial models, such as Facebook tagging system. `high` is robust against powerful modeled trained using different face recongition API. 
 - The perturbation generation takes ~60 seconds per image on a CPU machine, and it would be much faster on a GPU machine. Use `batch-size=1` on CPU and `batch-size>1` on GPUs. 
 - Turn on separate target if the images in the directory belong to different person, otherwise, turn it off. 
 - Run on GPU. The current fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run fawkes by `python3 fawkes/protection.py [args]`. 
