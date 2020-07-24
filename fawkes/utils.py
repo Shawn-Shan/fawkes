@@ -1,3 +1,4 @@
+import errno
 import glob
 import gzip
 import json
@@ -243,9 +244,9 @@ def fix_gpu_memory(mem_fraction=1):
 def preprocess(X, method):
     assert method in {'raw', 'imagenet', 'inception', 'mnist'}
 
-    if method is 'raw':
+    if method == 'raw':
         pass
-    elif method is 'imagenet':
+    elif method == 'imagenet':
         X = imagenet_preprocessing(X)
     else:
         raise Exception('unknown method %s' % method)
@@ -256,9 +257,9 @@ def preprocess(X, method):
 def reverse_preprocess(X, method):
     assert method in {'raw', 'imagenet', 'inception', 'mnist'}
 
-    if method is 'raw':
+    if method == 'raw':
         pass
-    elif method is 'imagenet':
+    elif method == 'imagenet':
         X = imagenet_reverse_preprocessing(X)
     else:
         raise Exception('unknown method %s' % method)
