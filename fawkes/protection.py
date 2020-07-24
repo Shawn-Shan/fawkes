@@ -81,8 +81,8 @@ class Fawkes(object):
                 print("Please enable GPU for ultra setting...")
                 sys.exit(1)
             th = 0.01
-            max_step = 200
-            lr = 20
+            max_step = 1000
+            lr = 10
         else:
             raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
         return th, max_step, lr
@@ -179,7 +179,7 @@ def main(*argv):
                         default="high_extract")
 
     parser.add_argument('--th', type=float, default=0.01)
-    parser.add_argument('--max-step', type=int, default=500)
+    parser.add_argument('--max-step', type=int, default=1000)
     parser.add_argument('--sd', type=int, default=1e9)
     parser.add_argument('--lr', type=float, default=2)
 

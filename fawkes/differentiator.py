@@ -407,7 +407,6 @@ class FawkesMaskGeneration:
 
             if iteration != 0 and iteration % (self.MAX_ITERATIONS // 3) == 0:
                 LR = LR * 0.8
-                print("LR: {}".format(LR))
 
             if iteration % (self.MAX_ITERATIONS // 5) == 0:
                 if self.verbose == 1:
