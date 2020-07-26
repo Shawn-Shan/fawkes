@@ -25,7 +25,7 @@ from PIL import Image, ExifTags
 from keras.layers import Dense, Activation, Dropout
 from keras.models import Model
 from keras.preprocessing import image
-from skimage.transform import resize
+# from skimage.transform import resize
 
 from fawkes.align_face import align
 from six.moves.urllib.request import urlopen
@@ -140,7 +140,6 @@ class Faces(object):
             cur_faces_square = []
             if verbose:
                 print("Find {} face(s) in {}".format(len(cur_faces), p.split("/")[-1]))
-
             if eval_local:
                 cur_faces = cur_faces[:1]
 
@@ -152,16 +151,16 @@ class Faces(object):
                     base = np.zeros((long_size, long_size, 3))
                     base[0:img.shape[0], 0:img.shape[1], :] = img
                 cur_faces_square.append(base)
-
             cur_index = align_img[1]
             cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]
+
             self.cropped_faces_shape.extend(cur_shapes)
             self.cropped_faces.extend(cur_faces_square)
             self.cropped_index.extend(cur_index)
             self.callback_idx.extend([i] * len(cur_faces_square))
 
-        if not self.cropped_faces:
-            raise Exception("No faces detected")
+        if len(self.cropped_faces) == 0:
+            return
 
         self.cropped_faces = np.array(self.cropped_faces)
 
@@ -173,15 +172,24 @@ class Faces(object):
     def get_faces(self):
         return self.cropped_faces
 
-    def merge_faces(self, cloaks):
+    def merge_faces(self, protected_images, original_images):
 
         self.cloaked_faces = np.copy(self.org_faces)
 
         for i in range(len(self.cropped_faces)):
-            cur_cloak = cloaks[i]
+            # cur_cloak = cloaks[i]
+            cur_protected = protected_images[i]
+            cur_original = original_images[i]
+
             org_shape = self.cropped_faces_shape[i]
             old_square_shape = max([org_shape[0], org_shape[1]])
-            reshape_cloak = resize(cur_cloak, (old_square_shape, old_square_shape))
+
+            # reshape_cloak = resize(cur_cloak, (old_square_shape, old_square_shape))
+            cur_protected = resize(cur_protected, (old_square_shape, old_square_shape))
+            cur_original = resize(cur_original, (old_square_shape, old_square_shape))
+
+            reshape_cloak = cur_protected - cur_original
+
             reshape_cloak = reshape_cloak[0:org_shape[0], 0:org_shape[1], :]
 
             callback_id = self.callback_idx[i]
@@ -209,6 +217,15 @@ def load_victim_model(number_classes, teacher_model=None, end2end=False, dropout
     opt = keras.optimizers.Adadelta()
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
     return model
+
+
+def resize(img, sz):
+    assert np.min(img) >= 0 and np.max(img) <= 255.0
+
+    from keras.preprocessing import image
+    im_data = image.array_to_img(img).resize((sz[1], sz[0]))
+    im_data = image.img_to_array(im_data)
+    return im_data
 
 
 def init_gpu(gpu_index, force=False):

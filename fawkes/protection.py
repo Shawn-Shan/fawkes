@@ -26,16 +26,6 @@ def generate_cloak_images(protector, image_X, target_emb=None):
     return cloaked_image_X
 
 
-def check_imgs(imgs):
-    if np.max(imgs) <= 1 and np.min(imgs) >= 0:
-        imgs = imgs * 255.0
-    elif np.max(imgs) <= 255 and np.min(imgs) >= 0:
-        pass
-    else:
-        raise Exception("Image values ")
-    return imgs
-
-
 class Fawkes(object):
     def __init__(self, feature_extractor, gpu, batch_size):
 
@@ -66,7 +56,7 @@ class Fawkes(object):
     def mode2param(self, mode):
         if mode == 'low':
             th = 0.003
-            max_step = 50
+            max_step = 40
             lr = 20
         elif mode == 'mid':
             th = 0.005
@@ -89,7 +79,6 @@ class Fawkes(object):
 
     def run_protection(self, image_paths, mode='low', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
                        separate_target=True, debug=False):
-
         if mode == 'custom':
             pass
         else:
@@ -101,11 +90,16 @@ class Fawkes(object):
         image_paths, loaded_images = filter_image_paths(image_paths)
 
         if not image_paths:
-            raise Exception("No images in the directory")
+            print("No images in the directory")
+            return 3
+
         with graph.as_default():
             faces = Faces(image_paths, loaded_images, self.aligner, verbose=1)
 
             original_images = faces.cropped_faces
+            if len(original_images) == 0:
+                print("No face detected. ")
+                return 2
             original_images = np.array(original_images)
 
             with sess.as_default():
@@ -143,16 +137,19 @@ class Fawkes(object):
 
                 faces.cloaked_cropped_faces = protected_images
 
-                cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(
-                    original_images)
-                final_images = faces.merge_faces(cloak_perturbation)
+                # cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(
+                #     original_images)
+                # final_images = faces.merge_faces(cloak_perturbation)
+
+                final_images = faces.merge_faces(reverse_process_cloaked(protected_images),
+                                                 reverse_process_cloaked(original_images))
 
         for p_img, path in zip(final_images, image_paths):
             file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
             dump_image(p_img, file_name, format=format)
 
         print("Done!")
-        return None
+        return 1
 
 
 def main(*argv):
@@ -201,9 +198,17 @@ def main(*argv):
     image_paths = [path for path in image_paths if "_cloaked" not in path.split("/")[-1]]
 
     protector = Fawkes(args.feature_extractor, args.gpu, args.batch_size)
-    protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr, max_step=args.max_step,
-                             batch_size=args.batch_size, format=args.format,
-                             separate_target=args.separate_target, debug=args.debug)
+    if args.mode != 'all':
+        protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr,
+                                 max_step=args.max_step,
+                                 batch_size=args.batch_size, format=args.format,
+                                 separate_target=args.separate_target, debug=args.debug)
+    else:
+        for m in ['low', 'mid', 'high']:
+            protector.run_protection(image_paths, mode=m, th=args.th, sd=args.sd, lr=args.lr,
+                                     max_step=args.max_step,
+                                     batch_size=args.batch_size, format=args.format,
+                                     separate_target=args.separate_target, debug=args.debug)
 
 
 if __name__ == '__main__':
