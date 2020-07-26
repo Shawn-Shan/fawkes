@@ -1,11 +1,11 @@
 Fawkes
 ------
 
-Fawkes is a privacy protection system developed by researchers at [SANDLab](http://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](http://sandlab.cs.uchicago.edu/fawkes/). Contact as at fawkes-team@googlegroups.com. 
+Fawkes is a privacy protection system developed by researchers at [SANDLab](https://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](https://sandlab.cs.uchicago.edu/fawkes/). Contact as at fawkes-team@googlegroups.com. 
 
 We published an academic paper to summarize our work "[Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models](https://www.shawnshan.com/files/publication/fawkes.pdf)" at *USENIX Security 2020*. 
 
-If you would like to use Fawkes to protect your identity, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
+If you would like to use Fawkes to protect your identity, please check out our binary implementation on the [website](https://sandlab.cs.uchicago.edu/fawkes/#code). 
 
 
 Copyright
@@ -49,7 +49,7 @@ We are actively working on this. Python script that can test the protection effe
 Quick Installation
 ------------------
 
-Install from [PyPI][pypi_fawkes]:
+Install from [PyPI](https://pypi.org/project/fawkes/):
 
 ```
 pip install fawkes
