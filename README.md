@@ -5,7 +5,8 @@ Fawkes is a privacy protection system developed by researchers at [SANDLab](http
 
 We published an academic paper to summarize our work "[Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models](https://www.shawnshan.com/files/publication/fawkes.pdf)" at *USENIX Security 2020*. 
 
-If you would like to use Fawkes to protect your identity, please check out our binary implementation on the [website](https://sandlab.cs.uchicago.edu/fawkes/#code). 
+NEW! If you would like to use Fawkes to protect your identity, please check out our software and binary implementation on the [website](https://sandlab.cs.uchicago.edu/fawkes/#code). 
+
 
 
 Copyright
