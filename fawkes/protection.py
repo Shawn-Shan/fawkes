@@ -55,16 +55,16 @@ class Fawkes(object):
 
     def mode2param(self, mode):
         if mode == 'low':
-            th = 0.003
-            max_step = 40
-            lr = 20
+            th = 0.0025
+            max_step = 30
+            lr = 30
         elif mode == 'mid':
             th = 0.005
-            max_step = 120
+            max_step = 100
             lr = 15
         elif mode == 'high':
             th = 0.008
-            max_step = 600
+            max_step = 500
             lr = 10
         elif mode == 'ultra':
             if not tf.test.is_gpu_available():
@@ -72,7 +72,7 @@ class Fawkes(object):
                 sys.exit(1)
             th = 0.01
             max_step = 1000
-            lr = 10
+            lr = 8
         else:
             raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
         return th, max_step, lr

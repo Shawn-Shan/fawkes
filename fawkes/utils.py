@@ -497,32 +497,8 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     original_feature_x = extractor_ls_predict(feature_extractors_ls, imgs)
 
     path2emb = load_embeddings(feature_extractors_names)
-    exclude_list = [1691, 19236, 20552, 9231, 18221, 8250, 18785, 6989, 17170,
-                    1704, 19394, 6058, 3327, 11885, 20375, 19150, 676, 11663,
-                    17261, 3527, 3956, 1973, 1197, 4859, 590, 13873, 928,
-                    14397, 4288, 3393, 6975, 16988, 1269, 323, 6409, 588,
-                    19738, 1845, 12123, 2714, 5318, 15325, 19268, 4650, 4714,
-                    3953, 6715, 6015, 12668, 13933, 14306, 2768, 20597, 4578,
-                    1278, 17549, 19355, 8882, 3276, 9148, 14517, 14915, 18209,
-                    3162, 8615, 18647, 749, 19259, 11490, 16046, 13259, 4429,
-                    10705, 12258, 13699, 4323, 15112, 14170, 3520, 17180, 5195,
-                    728, 2680, 13117, 20241, 15320, 8079, 2894, 11533, 10083,
-                    9628, 14944, 13124, 13316, 8006, 15353, 15261, 8865, 1213,
-                    1469, 20777, 9868, 10972, 9058, 18890, 13178, 13772, 15675,
-                    10572, 8771, 14211, 18781, 16347, 17985, 11456, 5849, 15709,
-                    20856, 2590, 15964, 8377, 5465, 16928, 13063, 19766, 19643,
-                    8651, 8517, 5985, 14817, 18926, 3791, 1864, 20061, 7697,
-                    13449, 19525, 13131, 421, 7629, 14689, 17521, 4509, 19374,
-                    17584, 11055, 11929, 17117, 7492, 14182, 409, 14294, 15033,
-                    10074, 9081, 7682, 19306, 3674, 945, 13211, 10933, 17953,
-                    12729, 8087, 20723, 5396, 14015, 20110, 15186, 6939, 239,
-                    2393, 17326, 13712, 9921, 7997, 6215, 14582, 864, 18906,
-                    9351, 9178, 3600, 18567, 8614, 19429, 286, 10042, 13030,
-                    7076, 3370, 15285, 7925, 10851, 5155, 14732, 12051, 11334,
-                    17035, 15476]
-    exclude_list = set(exclude_list)
 
-    items = list([(k, v) for k, v in path2emb.items() if k not in exclude_list])
+    items = list([(k, v) for k, v in path2emb.items()])
     paths = [p[0] for p in items]
     embs = [p[1] for p in items]
     embs = np.array(embs)
@@ -532,12 +508,14 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
 
     max_sum = np.min(pair_dist, axis=0)
     max_id_ls = np.argsort(max_sum)[::-1]
+
     max_id = random.choice(max_id_ls[:20])
 
     target_data_id = paths[int(max_id)]
+    print("target ID: {}".format(target_data_id))
 
     image_dir = os.path.join(model_dir, "target_data/{}".format(target_data_id))
-    # if not os.path.exists(image_dir):
+
     os.makedirs(os.path.join(model_dir, "target_data"), exist_ok=True)
     os.makedirs(image_dir, exist_ok=True)
     for i in range(10):
