@@ -1,11 +1,12 @@
 Fawkes
 ------
 
-Fawkes is a privacy protection system developed by researchers at [SANDLab](http://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](http://sandlab.cs.uchicago.edu/fawkes/). Contact as at fawkes-team@googlegroups.com. 
+Fawkes is a privacy protection system developed by researchers at [SANDLab](https://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](https://sandlab.cs.uchicago.edu/fawkes/). Contact us at fawkes-team@googlegroups.com. 
 
 We published an academic paper to summarize our work "[Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models](https://www.shawnshan.com/files/publication/fawkes.pdf)" at *USENIX Security 2020*. 
 
-If you would like to use Fawkes to protect your identity, please check out our binary implementation on the [website](http://sandlab.cs.uchicago.edu/fawkes/#code). 
+NEW! If you would like to use Fawkes to protect your identity, please check out our software and binary implementation on the [website](https://sandlab.cs.uchicago.edu/fawkes/#code). 
+
 
 
 Copyright
@@ -36,20 +37,20 @@ when --mode is `custom`:
 
 ### Example
 
-`fawkes -d ./imgs --mode mid`
+`fawkes -d ./imgs --mode low`
 
 ### Tips
 - The perturbation generation takes ~60 seconds per image on a CPU machine, and it would be much faster on a GPU machine. Use `batch-size=1` on CPU and `batch-size>1` on GPUs. 
-- Turn on separate target if the images in the directory belong to different person, otherwise, turn it off. 
-- Run on GPU. The current fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run fawkes by `python3 fawkes/protection.py [args]`. 
+- Turn on separate target if the images in the directory belong to different people, otherwise, turn it off. 
+- Run on GPU. The current Fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run Fawkes by `python3 fawkes/protection.py [args]`. 
 
 ### How do I know my images are secure? 
-We are actively working on this. Python script that can test the protection effectiveness will be ready shortly. 
+We are actively working on this. Python scripts that can test the protection effectiveness will be ready shortly. 
 
 Quick Installation
 ------------------
 
-Install from [PyPI][pypi_fawkes]:
+Install from [PyPI](https://pypi.org/project/fawkes/):
 
 ```
 pip install fawkes
