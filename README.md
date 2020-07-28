@@ -22,7 +22,7 @@ Usage
 
 Options:
 
-* `-m`, `--mode`       : the tradeoff between privacy and perturbation size
+* `-m`, `--mode`       : the tradeoff between privacy and perturbation size. Select from `low`, `mid`, `high`. 
 * `-d`, `--directory`  : the directory with images to run protection 
 * `-g`, `--gpu`        : the GPU id when using GPU for optimization
 * `--batch-size`       : number of images to run optimization together 
