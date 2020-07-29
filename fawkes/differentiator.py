@@ -161,7 +161,13 @@ class FawkesMaskGeneration:
 
         def calculate_direction(bottleneck_model, cur_timg_input, cur_simg_input):
             target_features = bottleneck_model(cur_timg_input)
-            return target_features
+            # return target_features
+            target_center = tf.reduce_mean(target_features, axis=0)
+            original = bottleneck_model(cur_simg_input)
+            original_center = tf.reduce_mean(original, axis=0)
+            direction = target_center - original_center
+            final_target = original + 2.0 * direction
+            return final_target
 
         self.bottlesim = 0.0
         self.bottlesim_sum = 0.0
@@ -280,14 +286,9 @@ class FawkesMaskGeneration:
 
     def attack_batch(self, source_imgs, target_imgs, weights):
 
-        """
-        Run the attack on a batch of images and labels.
-        """
-
         LR = self.learning_rate
         nb_imgs = source_imgs.shape[0]
         mask = [True] * nb_imgs + [False] * (self.batch_size - nb_imgs)
-        # mask = [True] * self.batch_size
         mask = np.array(mask, dtype=np.bool)
 
         source_imgs = np.array(source_imgs)
@@ -319,16 +320,6 @@ class FawkesMaskGeneration:
         if self.MIMIC_IMG:
             self.sess.run(self.setup,
                           {self.assign_timg_tanh: timg_tanh_batch,
-                           self.assign_simg_tanh: simg_tanh_batch,
-                           self.assign_const: CONST,
-                           self.assign_mask: mask,
-                           self.assign_weights: weights_batch,
-                           self.assign_modifier: modifier_batch})
-        else:
-            # if directly mimicking a vector, use assign_bottleneck_t_raw
-            # in setup
-            self.sess.run(self.setup,
-                          {self.assign_bottleneck_t_raw: timg_tanh_batch,
                            self.assign_simg_tanh: simg_tanh_batch,
                            self.assign_const: CONST,
                            self.assign_mask: mask,
@@ -394,12 +385,6 @@ class FawkesMaskGeneration:
                     best_bottlesim[e] = bottlesim
                     best_adv[e] = aimg_input
 
-                # if iteration > 20 and (dist_raw >= self.l_threshold or iteration == self.MAX_ITERATIONS - 1):
-                #     finished_idx.add(e)
-                #     print("{} finished at dist {}".format(e, dist_raw))
-                #     best_bottlesim[e] = bottlesim
-                #     best_adv[e] = aimg_input
-                #
                 all_clear = False
 
             if all_clear:

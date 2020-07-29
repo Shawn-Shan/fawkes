@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Date    : 2020-05-17
+# @Author  : Shawn Shan (shansixiong@cs.uchicago.edu)
+# @Link    : https://www.shawnshan.com/
+
+
 import errno
 import glob
 import gzip
@@ -23,10 +30,9 @@ import keras.backend as K
 import numpy as np
 import tensorflow as tf
 from PIL import Image, ExifTags
-from keras.layers import Dense, Activation, Dropout
+from keras.layers import Dense, Activation
 from keras.models import Model
 from keras.preprocessing import image
-# from skimage.transform import resize
 
 from fawkes.align_face import align
 from six.moves.urllib.request import urlopen
@@ -72,7 +78,12 @@ def load_image(path):
     except IsADirectoryError:
         return None
 
-    if img._getexif() is not None:
+    try:
+        info = img._getexif()
+    except OSError:
+        return None
+
+    if info is not None:
         for orientation in ExifTags.TAGS.keys():
             if ExifTags.TAGS[orientation] == 'Orientation':
                 break
@@ -109,7 +120,7 @@ def filter_image_paths(image_paths):
 
 
 class Faces(object):
-    def __init__(self, image_paths, loaded_images, aligner, verbose=1, eval_local=False):
+    def __init__(self, image_paths, loaded_images, aligner, verbose=1, eval_local=False, preprocessing=True):
         self.image_paths = image_paths
         self.verbose = verbose
         self.aligner = aligner
@@ -165,7 +176,8 @@ class Faces(object):
 
         self.cropped_faces = np.array(self.cropped_faces)
 
-        self.cropped_faces = preprocess(self.cropped_faces, 'imagenet')
+        if preprocessing:
+            self.cropped_faces = preprocess(self.cropped_faces, 'imagenet')
 
         self.cloaked_cropped_faces = None
         self.cloaked_faces = np.copy(self.org_faces)
@@ -178,14 +190,12 @@ class Faces(object):
         self.cloaked_faces = np.copy(self.org_faces)
 
         for i in range(len(self.cropped_faces)):
-            # cur_cloak = cloaks[i]
             cur_protected = protected_images[i]
             cur_original = original_images[i]
 
             org_shape = self.cropped_faces_shape[i]
             old_square_shape = max([org_shape[0], org_shape[1]])
 
-            # reshape_cloak = resize(cur_cloak, (old_square_shape, old_square_shape))
             cur_protected = resize(cur_protected, (old_square_shape, old_square_shape))
             cur_original = resize(cur_original, (old_square_shape, old_square_shape))
 
@@ -197,6 +207,8 @@ class Faces(object):
             bb = self.cropped_index[i]
             self.cloaked_faces[callback_id][bb[1]:bb[3], bb[0]:bb[2], :] += reshape_cloak
 
+        for i in range(0, len(self.cloaked_faces)):
+            self.cloaked_faces[i] = np.clip(self.cloaked_faces[i], 0.0, 255.0)
         return self.cloaked_faces
 
 
@@ -206,12 +218,11 @@ def dump_dictionary_as_json(dict, outfile):
         f.write(j.encode())
 
 
-def load_victim_model(number_classes, teacher_model=None, end2end=False, dropout=0):
+def load_victim_model(number_classes, teacher_model=None, end2end=False):
     for l in teacher_model.layers:
         l.trainable = end2end
     x = teacher_model.layers[-1].output
-    if dropout > 0:
-        x = Dropout(dropout)(x)
+
     x = Dense(number_classes)(x)
     x = Activation('softmax', name="act")(x)
     model = Model(teacher_model.input, x)
@@ -412,27 +423,10 @@ def get_dataset_path(dataset):
         'num_images']
 
 
-def normalize(x):
-    return x / np.linalg.norm(x, axis=1, keepdims=True)
-
-
 def dump_image(x, filename, format="png", scale=False):
-    # img = image.array_to_img(x, scale=scale)
-    img = image.array_to_img(x)
+    img = image.array_to_img(x, scale=scale)
     img.save(filename, format)
     return
-
-
-def load_dir(path):
-    assert os.path.exists(path)
-    x_ls = []
-    for file in os.listdir(path):
-        cur_path = os.path.join(path, file)
-        im = image.load_img(cur_path, target_size=(224, 224))
-        im = image.img_to_array(im)
-        x_ls.append(im)
-    raw_x = np.array(x_ls)
-    return preprocess(raw_x, 'imagenet')
 
 
 def load_embeddings(feature_extractors_names):
@@ -457,7 +451,6 @@ def extractor_ls_predict(feature_extractors_ls, X):
         cur_features = extractor.predict(X)
         feature_ls.append(cur_features)
     concated_feature_ls = np.concatenate(feature_ls, axis=1)
-    concated_feature_ls = normalize(concated_feature_ls)
     return concated_feature_ls
 
 
@@ -475,20 +468,6 @@ def pairwise_l2_distance(A, B):
     SqED[SqED < 0] = 0.0
     ED = np.sqrt(SqED)
     return ED
-
-
-def calculate_dist_score(a, b, feature_extractors_ls, metric='l2'):
-    features1 = extractor_ls_predict(feature_extractors_ls, a)
-    features2 = extractor_ls_predict(feature_extractors_ls, b)
-
-    pair_cos = pairwise_l2_distance(features1, features2)
-    max_sum = np.min(pair_cos, axis=0)
-    max_sum_arg = np.argsort(max_sum)[::-1]
-    max_sum_arg = max_sum_arg[:len(a)]
-    max_sum = [max_sum[i] for i in max_sum_arg]
-    paired_target_X = [b[j] for j in max_sum_arg]
-    paired_target_X = np.array(paired_target_X)
-    return np.min(max_sum), paired_target_X
 
 
 def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, metric='l2'):

@@ -1,6 +1,8 @@
-# from __future__ import absolute_import
-# from __future__ import division
-# from __future__ import print_function
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Date    : 2020-05-17
+# @Author  : Shawn Shan (shansixiong@cs.uchicago.edu)
+# @Link    : https://www.shawnshan.com/
 
 import argparse
 import glob
@@ -54,14 +56,18 @@ class Fawkes(object):
         self.protector_param = None
 
     def mode2param(self, mode):
-        if mode == 'low':
-            th = 0.0025
-            max_step = 30
-            lr = 30
+        if mode == 'min':
+            th = 0.002
+            max_step = 20
+            lr = 40
+        elif mode == 'low':
+            th = 0.003
+            max_step = 50
+            lr = 35
         elif mode == 'mid':
             th = 0.005
-            max_step = 100
-            lr = 15
+            max_step = 200
+            lr = 20
         elif mode == 'high':
             th = 0.008
             max_step = 500
@@ -77,7 +83,7 @@ class Fawkes(object):
             raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
         return th, max_step, lr
 
-    def run_protection(self, image_paths, mode='low', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
+    def run_protection(self, image_paths, mode='min', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
                        separate_target=True, debug=False):
         if mode == 'custom':
             pass
@@ -137,10 +143,6 @@ class Fawkes(object):
 
                 faces.cloaked_cropped_faces = protected_images
 
-                # cloak_perturbation = reverse_process_cloaked(protected_images) - reverse_process_cloaked(
-                #     original_images)
-                # final_images = faces.merge_faces(cloak_perturbation)
-
                 final_images = faces.merge_faces(reverse_process_cloaked(protected_images),
                                                  reverse_process_cloaked(original_images))
 
@@ -164,28 +166,34 @@ def main(*argv):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--directory', '-d', type=str,
-                        help='directory that contain images for cloaking', default='imgs/')
+                        help='the directory that contains images to run protection', default='imgs/')
 
     parser.add_argument('--gpu', '-g', type=str,
-                        help='GPU id', default='0')
+                        help='the GPU id when using GPU for optimization', default='0')
 
     parser.add_argument('--mode', '-m', type=str,
-                        help='cloak generation mode', default='low')
+                        help='cloak generation mode, select from min, low, mid, high. The higher the mode is, the more perturbation added and stronger protection',
+                        default='min')
+
     parser.add_argument('--feature-extractor', type=str,
-                        help="name of the feature extractor used for optimization",
+                        help="name of the feature extractor used for optimization, currently only support high_extract",
                         default="high_extract")
 
-    parser.add_argument('--th', type=float, default=0.01)
-    parser.add_argument('--max-step', type=int, default=1000)
-    parser.add_argument('--sd', type=int, default=1e9)
-    parser.add_argument('--lr', type=float, default=2)
+    parser.add_argument('--th', help='only relevant with mode=custom, DSSIM threshold for perturbation', type=float,
+                        default=0.01)
+    parser.add_argument('--max-step', help='only relevant with mode=custom, number of steps for optimization', type=int,
+                        default=1000)
+    parser.add_argument('--sd', type=int, help='only relevant with mode=custom, penalty number, read more in the paper',
+                        default=1e6)
+    parser.add_argument('--lr', type=float, help='only relevant with mode=custom, learning rate', default=2)
 
-    parser.add_argument('--batch-size', type=int, default=1)
-    parser.add_argument('--separate_target', action='store_true')
-    parser.add_argument('--debug', action='store_true')
-
+    parser.add_argument('--batch-size', help="number of images to run optimization together", type=int, default=1)
+    parser.add_argument('--separate_target', help="whether select separate targets for each faces in the directory",
+                        action='store_true')
+    parser.add_argument('--debug', help="turn on debug and copy/paste the stdout when reporting an issue on github",
+                        action='store_true')
     parser.add_argument('--format', type=str,
-                        help="final image format",
+                        help="format of the output image",
                         default="png")
 
     args = parser.parse_args(argv[1:])
@@ -198,17 +206,10 @@ def main(*argv):
     image_paths = [path for path in image_paths if "_cloaked" not in path.split("/")[-1]]
 
     protector = Fawkes(args.feature_extractor, args.gpu, args.batch_size)
-    if args.mode != 'all':
-        protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr,
-                                 max_step=args.max_step,
-                                 batch_size=args.batch_size, format=args.format,
-                                 separate_target=args.separate_target, debug=args.debug)
-    else:
-        for m in ['low', 'mid', 'high']:
-            protector.run_protection(image_paths, mode=m, th=args.th, sd=args.sd, lr=args.lr,
-                                     max_step=args.max_step,
-                                     batch_size=args.batch_size, format=args.format,
-                                     separate_target=args.separate_target, debug=args.debug)
+    protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr,
+                             max_step=args.max_step,
+                             batch_size=args.batch_size, format=args.format,
+                             separate_target=args.separate_target, debug=args.debug)
 
 
 if __name__ == '__main__':
