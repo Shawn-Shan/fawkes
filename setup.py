@@ -78,9 +78,7 @@ install_requires = [
     'numpy==1.16.4',
     # 'tensorflow-gpu>=1.13.1, <=1.14.0',
     'tensorflow>=1.12.0, <=1.15.0',  # change this is tensorflow-gpu if using GPU machine.
-    'argparse',
     'keras>=2.2.5, <=2.3.1',
-    'scikit-image',
     'pillow>=7.0.0',
     'bleach>=2.1.0'
 ]

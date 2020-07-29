@@ -394,12 +394,12 @@ def load_extractor(name):
         model = keras.models.load_model(model_file)
     else:
         print("Download models...")
-        get_file("{}.h5".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
+        get_file("{}.h5".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
                  cache_dir=model_dir, cache_subdir='')
         model = keras.models.load_model(model_file)
 
     if not os.path.exists(emb_file):
-        get_file("{}_emb.p.gz".format(name), "http://sandlab.cs.uchicago.edu/fawkes/files/{}_emb.p.gz".format(name),
+        get_file("{}_emb.p.gz".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}_emb.p.gz".format(name),
                  cache_dir=model_dir, cache_subdir='')
 
     if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
@@ -495,7 +495,7 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
             continue
         try:
             get_file("{}.jpg".format(i),
-                     "http://sandlab.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
+                     "http://mirror.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
                      cache_dir=model_dir, cache_subdir='target_data/{}/'.format(target_data_id))
         except Exception:
             pass
@@ -515,6 +515,10 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     target_images = random.sample(target_images, len(imgs))
     return np.array(target_images)
 
+
+""" TensorFlow implementation get_file
+https://github.com/tensorflow/tensorflow/blob/v2.3.0/tensorflow/python/keras/utils/data_utils.py#L168-L297
+"""
 
 def get_file(fname,
              origin,
