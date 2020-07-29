@@ -80,7 +80,7 @@ class Fawkes(object):
             max_step = 1000
             lr = 8
         else:
-            raise Exception("mode must be one of 'low', 'mid', 'high', 'ultra', 'custom'")
+            raise Exception("mode must be one of 'min', 'low', 'mid', 'high', 'ultra', 'custom'")
         return th, max_step, lr
 
     def run_protection(self, image_paths, mode='min', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',

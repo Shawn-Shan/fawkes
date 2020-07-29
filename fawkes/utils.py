@@ -233,7 +233,6 @@ def load_victim_model(number_classes, teacher_model=None, end2end=False):
 
 def resize(img, sz):
     assert np.min(img) >= 0 and np.max(img) <= 255.0
-
     from keras.preprocessing import image
     im_data = image.array_to_img(img).resize((sz[1], sz[0]))
     im_data = image.img_to_array(im_data)
@@ -431,18 +430,12 @@ def dump_image(x, filename, format="png", scale=False):
 
 def load_embeddings(feature_extractors_names):
     model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
-    dictionaries = []
     for extractor_name in feature_extractors_names:
         fp = gzip.open(os.path.join(model_dir, "{}_emb.p.gz".format(extractor_name)), 'rb')
         path2emb = pickle.load(fp)
         fp.close()
-        dictionaries.append(path2emb)
 
-    merge_dict = {}
-    for k in dictionaries[0].keys():
-        cur_emb = [dic[k] for dic in dictionaries]
-        merge_dict[k] = np.concatenate(cur_emb)
-    return merge_dict
+    return path2emb
 
 
 def extractor_ls_predict(feature_extractors_ls, X):
