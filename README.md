@@ -23,9 +23,9 @@ Usage
 Options:
 
 * `-m`, `--mode`       : the tradeoff between privacy and perturbation size. Select from `min`, `low`, `mid`, `high`. The higher the mode is, the more perturbation will add to the image and provide stronger protection. 
-* `-d`, `--directory`  : the directory with images to run protection 
-* `-g`, `--gpu`        : the GPU id when using GPU for optimization
-* `--batch-size`       : number of images to run optimization together 
+* `-d`, `--directory`  : the directory with images to run protection.
+* `-g`, `--gpu`        : the GPU id when using GPU for optimization.
+* `--batch-size`       : number of images to run optimization together. Change to >1 only if you have extremely powerful compute power. 
 * `--format`      : format of the output image. 
 
 when --mode is `custom`: 
