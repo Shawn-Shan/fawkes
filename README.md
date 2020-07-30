@@ -26,7 +26,7 @@ Options:
 * `-d`, `--directory`  : the directory with images to run protection.
 * `-g`, `--gpu`        : the GPU id when using GPU for optimization.
 * `--batch-size`       : number of images to run optimization together. Change to >1 only if you have extremely powerful compute power. 
-* `--format`      : format of the output image. 
+* `--format`      : format of the output image (png or jpg). 
 
 when --mode is `custom`: 
 * `--th`       : perturbation threshold
