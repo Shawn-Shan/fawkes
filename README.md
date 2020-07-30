@@ -37,7 +37,7 @@ when --mode is `custom`:
 
 ### Example
 
-`fawkes -d ./imgs --mode low`
+`fawkes -d ./imgs --mode min`
 
 ### Tips
 - The perturbation generation takes ~60 seconds per image on a CPU machine, and it would be much faster on a GPU machine. Use `batch-size=1` on CPU and `batch-size>1` on GPUs. 
