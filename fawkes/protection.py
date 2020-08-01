@@ -84,7 +84,7 @@ class Fawkes(object):
         return th, max_step, lr
 
     def run_protection(self, image_paths, mode='min', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
-                       separate_target=True, debug=False):
+                       separate_target=True, debug=False, no_align=False):
         if mode == 'custom':
             pass
         else:
@@ -100,9 +100,9 @@ class Fawkes(object):
             return 3
 
         with graph.as_default():
-            faces = Faces(image_paths, loaded_images, self.aligner, verbose=1)
-
+            faces = Faces(image_paths, loaded_images, self.aligner, verbose=1, no_align=no_align)
             original_images = faces.cropped_faces
+
             if len(original_images) == 0:
                 print("No face detected. ")
                 return 2
@@ -184,11 +184,13 @@ def main(*argv):
     parser.add_argument('--max-step', help='only relevant with mode=custom, number of steps for optimization', type=int,
                         default=1000)
     parser.add_argument('--sd', type=int, help='only relevant with mode=custom, penalty number, read more in the paper',
-                        default=1e6)
+                        default=1e9)
     parser.add_argument('--lr', type=float, help='only relevant with mode=custom, learning rate', default=2)
 
     parser.add_argument('--batch-size', help="number of images to run optimization together", type=int, default=1)
     parser.add_argument('--separate_target', help="whether select separate targets for each faces in the directory",
+                        action='store_true')
+    parser.add_argument('--no-align', help="whether to detect and crop faces",
                         action='store_true')
     parser.add_argument('--debug', help="turn on debug and copy/paste the stdout when reporting an issue on github",
                         action='store_true')
@@ -209,7 +211,7 @@ def main(*argv):
     protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr,
                              max_step=args.max_step,
                              batch_size=args.batch_size, format=args.format,
-                             separate_target=args.separate_target, debug=args.debug)
+                             separate_target=args.separate_target, debug=args.debug, no_align=args.no_align)
 
 
 if __name__ == '__main__':

@@ -120,9 +120,11 @@ def filter_image_paths(image_paths):
 
 
 class Faces(object):
-    def __init__(self, image_paths, loaded_images, aligner, verbose=1, eval_local=False, preprocessing=True):
+    def __init__(self, image_paths, loaded_images, aligner, verbose=1, eval_local=False, preprocessing=True,
+                 no_align=False):
         self.image_paths = image_paths
         self.verbose = verbose
+        self.no_align = no_align
         self.aligner = aligner
         self.org_faces = []
         self.cropped_faces = []
@@ -132,25 +134,27 @@ class Faces(object):
         for i in range(0, len(loaded_images)):
             cur_img = loaded_images[i]
             p = image_paths[i]
-
             self.org_faces.append(cur_img)
 
             if eval_local:
                 margin = 0
             else:
                 margin = 0.7
-            align_img = align(cur_img, self.aligner, margin=margin)
 
-            if align_img is None:
-                print("Find 0 face(s)".format(p.split("/")[-1]))
-                continue
+            if not no_align:
+                align_img = align(cur_img, self.aligner, margin=margin)
+                if align_img is None:
+                    print("Find 0 face(s)".format(p.split("/")[-1]))
+                    continue
 
-            cur_faces = align_img[0]
+                cur_faces = align_img[0]
+            else:
+                cur_faces = [cur_img]
 
             cur_shapes = [f.shape[:-1] for f in cur_faces]
 
             cur_faces_square = []
-            if verbose:
+            if verbose and not no_align:
                 print("Find {} face(s) in {}".format(len(cur_faces), p.split("/")[-1]))
             if eval_local:
                 cur_faces = cur_faces[:1]
@@ -161,15 +165,21 @@ class Faces(object):
                 else:
                     long_size = max([img.shape[1], img.shape[0]])
                     base = np.zeros((long_size, long_size, 3))
+                    # import pdb
+                    # pdb.set_trace()
+
                     base[0:img.shape[0], 0:img.shape[1], :] = img
                 cur_faces_square.append(base)
-            cur_index = align_img[1]
-            cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]
 
-            self.cropped_faces_shape.extend(cur_shapes)
+            cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]
             self.cropped_faces.extend(cur_faces_square)
-            self.cropped_index.extend(cur_index)
-            self.callback_idx.extend([i] * len(cur_faces_square))
+
+            if not self.no_align:
+                cur_index = align_img[1]
+
+                self.cropped_faces_shape.extend(cur_shapes)
+                self.cropped_index.extend(cur_index)
+                self.callback_idx.extend([i] * len(cur_faces_square))
 
         if len(self.cropped_faces) == 0:
             return
@@ -186,6 +196,8 @@ class Faces(object):
         return self.cropped_faces
 
     def merge_faces(self, protected_images, original_images):
+        if self.no_align:
+            return np.clip(protected_images, 0.0, 255.0)
 
         self.cloaked_faces = np.copy(self.org_faces)
 
@@ -519,6 +531,7 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
 """ TensorFlow implementation get_file
 https://github.com/tensorflow/tensorflow/blob/v2.3.0/tensorflow/python/keras/utils/data_utils.py#L168-L297
 """
+
 
 def get_file(fname,
              origin,
