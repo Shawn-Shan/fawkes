@@ -44,6 +44,8 @@ when --mode is `custom`:
 - Turn on separate target if the images in the directory belong to different people, otherwise, turn it off. 
 - Run on GPU. The current Fawkes package and binary does not support GPU. To use GPU, you need to clone this, install the required packages in `setup.py`, and replace tensorflow with tensorflow-gpu. Then you can run Fawkes by `python3 fawkes/protection.py [args]`. 
 
+![Obama in different settings](https://sandlab.cs.uchicago.edu/fawkes/files/obama.png)
+
 ### How do I know my images are secure? 
 We are actively working on this. Python scripts that can test the protection effectiveness will be ready shortly. 
 
