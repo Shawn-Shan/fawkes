@@ -58,6 +58,10 @@ pip install fawkes
 
 If you don't have root privilege, please try to install on user namespace: `pip install --user fawkes`.
 
+Contribute to Fawkes
+--------------------
+
+If you would like to contribute to make Fawkes software better, please checkout our [project list](https://github.com/Shawn-Shan/fawkes/projects/1) which contains our TODOs. If you are confident in helping, please open a pull requests and explain the plans for your changes. We will try our best to approve asap, and once approved, you can work on it. 
 
 
 ### Citation
