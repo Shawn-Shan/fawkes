@@ -194,13 +194,12 @@ def main(*argv):
                         action='store_true')
     parser.add_argument('--debug', help="turn on debug and copy/paste the stdout when reporting an issue on github",
                         action='store_true')
-    parser.add_argument('--format', type=str,
+    parser.add_argument('--format', type=str, choices=('png', 'jpg', 'jpeg'),
                         help="format of the output image",
                         default="png")
 
     args = parser.parse_args(argv[1:])
 
-    assert args.format in ['png', 'jpg', 'jpeg']
     if args.format == 'jpg':
         args.format = 'jpeg'
 
