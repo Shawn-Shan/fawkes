@@ -404,7 +404,9 @@ class FawkesMaskGeneration:
             if self.verbose == 0:
                 progressbar.update(iteration)
 
-        if self.verbose == 1:
+        if self.verbose == 0:
+            progressbar.update(self.MAX_ITERATIONS)
+        elif self.verbose == 1:
             loss_sum = float(self.sess.run(self.loss_sum))
             dist_sum = float(self.sess.run(self.dist_sum))
             dist_raw_sum = float(self.sess.run(self.dist_raw_sum))
