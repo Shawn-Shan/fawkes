@@ -60,6 +60,8 @@ pip install fawkes
 
 If you don't have root privilege, please try to install on user namespace: `pip install --user fawkes`.
 
+Python 3.8 is not supported, so make sure you are using an earlier version.
+
 Contribute to Fawkes
 --------------------
 
