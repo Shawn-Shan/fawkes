@@ -34,6 +34,7 @@ when --mode is `custom`:
 * `--lr`       : learning rate for the optimization
 * `--feature-extractor` : name of the feature extractor to use
 * `--separate_target`   : whether select separate targets for each faces in the diectory. 
+* `--no-rename-file`   : option to directly replace the original file, keeping the same format. If used, format option is ignored. 
 
 ### Example
 
