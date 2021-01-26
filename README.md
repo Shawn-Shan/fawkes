@@ -1,6 +1,6 @@
 Fawkes
 ------
-:warning: Check out our MacOS/Windows Software on the [website](https://sandlab.cs.uchicago.edu/fawkes/#code). 
+:warning: Check out our MacOS/Windows Software on our official [webpage](https://sandlab.cs.uchicago.edu/fawkes/#code). 
 
 Fawkes is a privacy protection system developed by researchers at [SANDLab](https://sandlab.cs.uchicago.edu/), University of Chicago. For more information about the project, please refer to our project [webpage](https://sandlab.cs.uchicago.edu/fawkes/). Contact us at fawkes-team@googlegroups.com. 
 
