@@ -79,7 +79,7 @@ If you would like to contribute to make Fawkes software better, please checkout 
 @inproceedings{shan2020fawkes,
   title={Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models},
   author={Shan, Shawn and Wenger, Emily and Zhang, Jiayun and Li, Huiying and Zheng, Haitao and Zhao, Ben Y},
-  booktitle={Proc. of USENIX Security},
+  booktitle={Proc. of {USENIX} Security},
   year={2020}
 }
 ```
