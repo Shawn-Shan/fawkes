@@ -84,7 +84,7 @@ class Fawkes(object):
         return th, max_step, lr
 
     def run_protection(self, image_paths, mode='min', th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
-                       separate_target=True, debug=False, no_align=False):
+                       separate_target=True, debug=False, no_align=False, no_rename=False):
         if mode == 'custom':
             pass
         else:
@@ -147,8 +147,14 @@ class Fawkes(object):
                                                  reverse_process_cloaked(original_images))
 
         for p_img, path in zip(final_images, image_paths):
-            file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
-            dump_image(p_img, file_name, format=format)
+            if no_rename:
+                format = path.split(".")[-1]
+                if format == 'jpg':
+                    format = 'jpeg'
+                dump_image(p_img, path, format=format)
+            else:
+                file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), mode, format)
+                dump_image(p_img, file_name, format=format)
 
         print("Done!")
         return 1
@@ -197,6 +203,8 @@ def main(*argv):
     parser.add_argument('--format', type=str,
                         help="format of the output image",
                         default="png")
+    parser.add_argument('--no-rename-file', help="option to directly replace the original file, keeping the same format. If used, format option is ignored",
+                        action='store_true')
 
     args = parser.parse_args(argv[1:])
 
@@ -213,12 +221,12 @@ def main(*argv):
             protector.run_protection(image_paths, mode=mode, th=args.th, sd=args.sd, lr=args.lr,
                                      max_step=args.max_step,
                                      batch_size=args.batch_size, format=args.format,
-                                     separate_target=args.separate_target, debug=args.debug, no_align=args.no_align)
+                                     separate_target=args.separate_target, debug=args.debug, no_align=args.no_align, no_rename=args.no_rename_file)
     else:
         protector.run_protection(image_paths, mode=args.mode, th=args.th, sd=args.sd, lr=args.lr,
                                  max_step=args.max_step,
                                  batch_size=args.batch_size, format=args.format,
-                                 separate_target=args.separate_target, debug=args.debug, no_align=args.no_align)
+                                 separate_target=args.separate_target, debug=args.debug, no_align=args.no_align, no_rename=args.no_rename_file)
 
 
 if __name__ == '__main__':
