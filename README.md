@@ -32,7 +32,7 @@ when --mode is `custom`:
 * `--max-step`       : number of optimization steps to run 
 * `--lr`       : learning rate for the optimization
 * `--feature-extractor` : name of the feature extractor to use
-* `--separate_target`   : whether select separate targets for each faces in the diectory. 
+* `--separate_target`   : whether select separate targets for each faces in the directory. 
 
 ### Example
 
