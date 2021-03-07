@@ -433,6 +433,7 @@ def load_extractor(name):
     model_file = pkg_resources.resource_filename("fawkes", "model/{}.h5".format(name))
     cur_hash = hash_map[name]
     model_dir = pkg_resources.resource_filename("fawkes", "model/")
+    os.makedirs(model_dir, exist_ok=True)
     get_file("{}.h5".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
              cache_dir=model_dir, cache_subdir='', md5_hash=cur_hash)
 
@@ -530,7 +531,6 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     max_id = random.choice(max_id_ls[:20])
 
     target_data_id = paths[int(max_id)]
-    target_data_id = 9
     print("target ID: {}".format(target_data_id))
 
     image_dir = os.path.join(model_dir, "target_data/{}".format(target_data_id))
