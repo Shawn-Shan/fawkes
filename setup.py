@@ -75,10 +75,10 @@ class DeployCommand(Command):
 setup_requires = []
 
 install_requires = [
-    'numpy==1.16.4',
-    # 'tensorflow-gpu>=1.13.1, <=1.14.0',
-    'tensorflow>=1.12.0, <=1.15.0',  # change this is tensorflow-gpu if using GPU machine.
-    'keras>=2.2.5, <=2.3.1',
+    'numpy>=1.19.5',
+    'tensorflow>=2.0.0',
+    'keras>=2.3.1',
+    'mtcnn',
     'pillow>=7.0.0',
     'bleach>=2.1.0'
 ]
@@ -92,8 +92,8 @@ setup(
     long_description_content_type='text/markdown',
     url="https://github.com/Shawn-Shan/fawkes",
     author='Shawn Shan',
-    author_email='shansixiong@cs.uchicago.edu',
-    keywords='fawkes privacy clearview',
+    author_email='shawnshan@cs.uchicago.edu',
+    keywords='fawkes privacy ML',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
@@ -112,5 +112,5 @@ setup(
     },
     include_package_data=True,
     zip_safe=False,
-    python_requires='>=3.5,<3.8',
+    python_requires='>=3.5',
 )

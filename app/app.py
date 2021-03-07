@@ -4,7 +4,8 @@ from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import QFileDialog
 from fawkes.protection import Fawkes
-
+import os
+os.environ['QT_MAC_WANTS_LAYER'] = '1'
 
 class Worker(QThread):
     signal = pyqtSignal('PyQt_PyObject')
@@ -16,7 +17,7 @@ class Worker(QThread):
 
     def run(self):
         if self.my_fawkes is None:
-            self.my_fawkes = Fawkes("high_extract", '0', 1)
+            self.my_fawkes = Fawkes("extractor_2", '0', 1)
         status = self.my_fawkes.run_protection(self.image_paths, debug=True)
         self.signal.emit(status)
 
