@@ -8,6 +8,7 @@
 import errno
 import glob
 import gzip
+import hashlib
 import json
 import os
 import pickle
@@ -18,7 +19,9 @@ import tarfile
 import zipfile
 
 import PIL
+import pkg_resources
 import six
+from keras.utils import Progbar
 from six.moves.urllib.error import HTTPError, URLError
 
 stderr = sys.stderr
@@ -68,6 +71,10 @@ def clip_img(X, preprocessing='raw'):
     X = np.clip(X, 0.0, 255.0)
     X = preprocess(X, preprocessing)
     return X
+
+
+IMG_SIZE = 112
+PREPROCESS = 'raw'
 
 
 def load_image(path):
@@ -130,7 +137,9 @@ class Faces(object):
         self.cropped_faces = []
         self.cropped_faces_shape = []
         self.cropped_index = []
+        self.start_end_ls = []
         self.callback_idx = []
+        self.images_without_face = []
         for i in range(0, len(loaded_images)):
             cur_img = loaded_images[i]
             p = image_paths[i]
@@ -144,13 +153,15 @@ class Faces(object):
             if not no_align:
                 align_img = align(cur_img, self.aligner, margin=margin)
                 if align_img is None:
-                    print("Find 0 face(s)".format(p.split("/")[-1]))
+                    print("Find 0 face(s) in {}".format(p.split("/")[-1]))
+                    self.images_without_face.append(i)
                     continue
 
                 cur_faces = align_img[0]
             else:
                 cur_faces = [cur_img]
 
+            cur_faces = [face for face in cur_faces if face.shape[0] != 0 and face.shape[1] != 0]
             cur_shapes = [f.shape[:-1] for f in cur_faces]
 
             cur_faces_square = []
@@ -161,17 +172,20 @@ class Faces(object):
 
             for img in cur_faces:
                 if eval_local:
-                    base = resize(img, (224, 224))
+                    base = resize(img, (IMG_SIZE, IMG_SIZE))
                 else:
                     long_size = max([img.shape[1], img.shape[0]])
-                    base = np.zeros((long_size, long_size, 3))
-                    # import pdb
-                    # pdb.set_trace()
+                    base = np.ones((long_size, long_size, 3)) * np.mean(img, axis=(0, 1))
 
-                    base[0:img.shape[0], 0:img.shape[1], :] = img
+                    start1, end1 = get_ends(long_size, img.shape[0])
+                    start2, end2 = get_ends(long_size, img.shape[1])
+
+                    base[start1:end1, start2:end2, :] = img
+                    cur_start_end = (start1, end1, start2, end2)
+                    self.start_end_ls.append(cur_start_end)
+
                 cur_faces_square.append(base)
-
-            cur_faces_square = [resize(f, (224, 224)) for f in cur_faces_square]
+            cur_faces_square = [resize(f, (IMG_SIZE, IMG_SIZE)) for f in cur_faces_square]
             self.cropped_faces.extend(cur_faces_square)
 
             if not self.no_align:
@@ -187,7 +201,7 @@ class Faces(object):
         self.cropped_faces = np.array(self.cropped_faces)
 
         if preprocessing:
-            self.cropped_faces = preprocess(self.cropped_faces, 'imagenet')
+            self.cropped_faces = preprocess(self.cropped_faces, PREPROCESS)
 
         self.cloaked_cropped_faces = None
         self.cloaked_faces = np.copy(self.org_faces)
@@ -197,7 +211,7 @@ class Faces(object):
 
     def merge_faces(self, protected_images, original_images):
         if self.no_align:
-            return np.clip(protected_images, 0.0, 255.0)
+            return np.clip(protected_images, 0.0, 255.0), self.images_without_face
 
         self.cloaked_faces = np.copy(self.org_faces)
 
@@ -206,22 +220,29 @@ class Faces(object):
             cur_original = original_images[i]
 
             org_shape = self.cropped_faces_shape[i]
-            old_square_shape = max([org_shape[0], org_shape[1]])
 
+            old_square_shape = max([org_shape[0], org_shape[1]])
             cur_protected = resize(cur_protected, (old_square_shape, old_square_shape))
             cur_original = resize(cur_original, (old_square_shape, old_square_shape))
 
-            reshape_cloak = cur_protected - cur_original
+            start1, end1, start2, end2 = self.start_end_ls[i]
 
-            reshape_cloak = reshape_cloak[0:org_shape[0], 0:org_shape[1], :]
+            reshape_cloak = cur_protected - cur_original
+            reshape_cloak = reshape_cloak[start1:end1, start2:end2, :]
 
             callback_id = self.callback_idx[i]
             bb = self.cropped_index[i]
-            self.cloaked_faces[callback_id][bb[1]:bb[3], bb[0]:bb[2], :] += reshape_cloak
+            self.cloaked_faces[callback_id][bb[0]:bb[2], bb[1]:bb[3], :] += reshape_cloak
 
         for i in range(0, len(self.cloaked_faces)):
             self.cloaked_faces[i] = np.clip(self.cloaked_faces[i], 0.0, 255.0)
-        return self.cloaked_faces
+        return self.cloaked_faces, self.images_without_face
+
+
+def get_ends(longsize, window):
+    start = (longsize - window) // 2
+    end = start + window
+    return start, end
 
 
 def dump_dictionary_as_json(dict, outfile):
@@ -251,17 +272,25 @@ def resize(img, sz):
     return im_data
 
 
-def init_gpu(gpu_index, force=False):
-    if isinstance(gpu_index, list):
-        gpu_num = ','.join([str(i) for i in gpu_index])
+def init_gpu(gpu):
+    ''' code to initialize gpu in tf2'''
+    if isinstance(gpu, list):
+        gpu_num = ','.join([str(i) for i in gpu])
     else:
-        gpu_num = str(gpu_index)
-    if "CUDA_VISIBLE_DEVICES" in os.environ and os.environ["CUDA_VISIBLE_DEVICES"] and not force:
+        gpu_num = str(gpu)
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
         print('GPU already initiated')
         return
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu_num
-    sess = fix_gpu_memory()
-    return sess
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
+            tf.config.experimental.set_memory_growth(gpus[0], True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPU")
+        except RuntimeError as e:
+            print(e)
 
 
 def fix_gpu_memory(mem_fraction=1):
@@ -398,26 +427,32 @@ def build_bottleneck_model(model, cut_off):
 
 
 def load_extractor(name):
-    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+    hash_map = {"extractor_2": "ce703d481db2b83513bbdafa27434703",
+                "extractor_0": "94854151fd9077997d69ceda107f9c6b"}
+    assert name in ["extractor_2", 'extractor_0']
+    model_file = pkg_resources.resource_filename("fawkes", "model/{}.h5".format(name))
+    cur_hash = hash_map[name]
+    model_dir = pkg_resources.resource_filename("fawkes", "model/")
     os.makedirs(model_dir, exist_ok=True)
-    model_file = os.path.join(model_dir, "{}.h5".format(name))
-    emb_file = os.path.join(model_dir, "{}_emb.p.gz".format(name))
-    if os.path.exists(model_file):
-        model = keras.models.load_model(model_file)
-    else:
-        print("Download models...")
-        get_file("{}.h5".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
-                 cache_dir=model_dir, cache_subdir='')
-        model = keras.models.load_model(model_file)
+    get_file("{}.h5".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
+             cache_dir=model_dir, cache_subdir='', md5_hash=cur_hash)
 
-    if not os.path.exists(emb_file):
-        get_file("{}_emb.p.gz".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}_emb.p.gz".format(name),
-                 cache_dir=model_dir, cache_subdir='')
-
-    if hasattr(model.layers[-1], "activation") and model.layers[-1].activation == "softmax":
-        raise Exception(
-            "Given extractor's last layer is softmax, need to remove the top layers to make it into a feature extractor")
+    model = keras.models.load_model(model_file)
+    model = Extractor(model)
     return model
+
+
+class Extractor(object):
+    def __init__(self, model):
+        self.model = model
+
+    def predict(self, imgs):
+        imgs = imgs / 255.0
+        embeds = l2_norm(self.model(imgs))
+        return embeds
+
+    def __call__(self, x):
+        return self.predict(x)
 
 
 def get_dataset_path(dataset):
@@ -517,8 +552,8 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
     target_images = [image.img_to_array(image.load_img(cur_path)) for cur_path in
                      image_paths]
 
-    target_images = np.array([resize(x, (224, 224)) for x in target_images])
-    target_images = preprocess(target_images, 'imagenet')
+    target_images = np.array([resize(x, (IMG_SIZE, IMG_SIZE)) for x in target_images])
+    target_images = preprocess(target_images, PREPROCESS)
 
     target_images = list(target_images)
     while len(target_images) < len(imgs):
@@ -526,6 +561,13 @@ def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, m
 
     target_images = random.sample(target_images, len(imgs))
     return np.array(target_images)
+
+
+def l2_norm(x, axis=1):
+    """l2 norm"""
+    norm = tf.norm(x, axis=axis, keepdims=True)
+    output = x / norm
+    return output
 
 
 """ TensorFlow implementation get_file
@@ -544,15 +586,17 @@ def get_file(fname,
              archive_format='auto',
              cache_dir=None):
     if cache_dir is None:
-        cache_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
+        cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
     if md5_hash is not None and file_hash is None:
         file_hash = md5_hash
         hash_algorithm = 'md5'
     datadir_base = os.path.expanduser(cache_dir)
     if not os.access(datadir_base, os.W_OK):
-        datadir_base = os.path.join('/tmp', '.fawkes')
+        datadir_base = os.path.join('/tmp', '.keras')
     datadir = os.path.join(datadir_base, cache_subdir)
     _makedirs_exist_ok(datadir)
+
+    # fname = path_to_string(fname)
 
     if untar:
         untar_fpath = os.path.join(datadir, fname)
@@ -561,12 +605,35 @@ def get_file(fname,
         fpath = os.path.join(datadir, fname)
 
     download = False
-    if not os.path.exists(fpath):
+    if os.path.exists(fpath):
+        # File found; verify integrity if a hash was provided.
+        if file_hash is not None:
+            if not validate_file(fpath, file_hash, algorithm=hash_algorithm):
+                print('A local file was found, but it seems to be '
+                      'incomplete or outdated because the ' + hash_algorithm +
+                      ' file hash does not match the original value of ' + file_hash +
+                      ' so we will re-download the data.')
+                download = True
+    else:
         download = True
 
     if download:
+        print('Downloading data from', origin)
+
+        class ProgressTracker(object):
+            # Maintain progbar for the lifetime of download.
+            # This design was chosen for Python 2.7 compatibility.
+            progbar = None
+
+        def dl_progress(count, block_size, total_size):
+            if ProgressTracker.progbar is None:
+                if total_size == -1:
+                    total_size = None
+                ProgressTracker.progbar = Progbar(total_size)
+            else:
+                ProgressTracker.progbar.update(count * block_size)
+
         error_msg = 'URL fetch failure on {}: {} -- {}'
-        dl_progress = None
         try:
             try:
                 urlretrieve(origin, fpath, dl_progress)
@@ -578,7 +645,7 @@ def get_file(fname,
             if os.path.exists(fpath):
                 os.remove(fpath)
             raise
-        # ProgressTracker.progbar = None
+        ProgressTracker.progbar = None
 
     if untar:
         if not os.path.exists(untar_fpath):
@@ -632,3 +699,53 @@ def _makedirs_exist_ok(datadir):
                 raise
     else:
         os.makedirs(datadir, exist_ok=True)  # pylint: disable=unexpected-keyword-arg
+
+
+def validate_file(fpath, file_hash, algorithm='auto', chunk_size=65535):
+    """Validates a file against a sha256 or md5 hash.
+    Arguments:
+        fpath: path to the file being validated
+        file_hash:  The expected hash string of the file.
+            The sha256 and md5 hash algorithms are both supported.
+        algorithm: Hash algorithm, one of 'auto', 'sha256', or 'md5'.
+            The default 'auto' detects the hash algorithm in use.
+        chunk_size: Bytes to read at a time, important for large files.
+    Returns:
+        Whether the file is valid
+    """
+    if (algorithm == 'sha256') or (algorithm == 'auto' and len(file_hash) == 64):
+        hasher = 'sha256'
+    else:
+        hasher = 'md5'
+
+    if str(_hash_file(fpath, hasher, chunk_size)) == str(file_hash):
+        return True
+    else:
+        return False
+
+
+def _hash_file(fpath, algorithm='sha256', chunk_size=65535):
+    """Calculates a file sha256 or md5 hash.
+    Example:
+    ```python
+    _hash_file('/path/to/file.zip')
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    ```
+    Arguments:
+        fpath: path to the file being validated
+        algorithm: hash algorithm, one of `'auto'`, `'sha256'`, or `'md5'`.
+            The default `'auto'` detects the hash algorithm in use.
+        chunk_size: Bytes to read at a time, important for large files.
+    Returns:
+        The file hash
+    """
+    if (algorithm == 'sha256') or (algorithm == 'auto' and len(hash) == 64):
+        hasher = hashlib.sha256()
+    else:
+        hasher = hashlib.md5()
+
+    with open(fpath, 'rb') as fpath_file:
+        for chunk in iter(lambda: fpath_file.read(chunk_size), b''):
+            hasher.update(chunk)
+
+    return hasher.hexdigest()
