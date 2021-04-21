@@ -190,9 +190,8 @@ class Faces(object):
 
             if not self.no_align:
                 cur_index = align_img[1]
-
                 self.cropped_faces_shape.extend(cur_shapes)
-                self.cropped_index.extend(cur_index)
+                self.cropped_index.extend(cur_index[:len(cur_faces_square)])
                 self.callback_idx.extend([i] * len(cur_faces_square))
 
         if len(self.cropped_faces) == 0:

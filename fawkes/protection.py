@@ -46,12 +46,8 @@ class Fawkes(object):
         self.th = th
         self.lr = lr
         self.max_step = max_step
-
-        init_gpu(gpu)
-
-        # model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
-        # if not os.path.exists(os.path.join(model_dir)):
-        #     os.makedirs(model_dir, exist_ok=True)
+        if gpu is not None:
+            init_gpu(gpu)
 
         self.aligner = aligner()
 
@@ -61,20 +57,20 @@ class Fawkes(object):
 
     def mode2param(self, mode):
         if mode == 'low':
-            th = 0.005
+            th = 0.0045
             max_step = 25
             lr = 25
             extractors = ["extractor_2"]
 
         elif mode == 'mid':
-            th = 0.01
+            th = 0.012
             max_step = 50
             lr = 20
             extractors = ["extractor_0", "extractor_2"]
 
         elif mode == 'high':
-            th = 0.015
-            max_step = 100
+            th = 0.017
+            max_step = 150
             lr = 15
             extractors = ["extractor_0", "extractor_2"]
 
@@ -82,7 +78,7 @@ class Fawkes(object):
             raise Exception("mode must be one of 'min', 'low', 'mid', 'high'")
         return th, max_step, lr, extractors
 
-    def run_protection(self, image_paths, th=0.04, sd=1e9, lr=10, max_step=500, batch_size=1, format='png',
+    def run_protection(self, image_paths, th=0.04, sd=1e7, lr=10, max_step=500, batch_size=1, format='png',
                        separate_target=True, debug=False, no_align=False, exp="", maximize=True,
                        save_last_on_failed=True):
 
@@ -117,7 +113,7 @@ class Fawkes(object):
                                                   learning_rate=self.lr,
                                                   max_iterations=self.max_step,
                                                   l_threshold=self.th,
-                                                  verbose=0,
+                                                  verbose=debug,
                                                   maximize=maximize,
                                                   keep_final=False,
                                                   image_shape=(IMG_SIZE, IMG_SIZE, 3),
@@ -137,7 +133,7 @@ class Fawkes(object):
                 continue
             p_img = final_images[i]
             path = image_paths[i]
-            file_name = "{}_cloaked.{}".format(".".join(path.split(".")[:-1]), format)
+            file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), self.mode, format)
             dump_image(p_img, file_name, format=format)
 
         print("Done!")
