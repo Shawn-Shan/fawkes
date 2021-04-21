@@ -32,7 +32,10 @@ Options:
 
 ### Example
 
-`fawkes -d ./imgs --mode min`
+`fawkes -d ./imgs --mode low`
+
+or `python3 protection.py -d ./imgs --mode low`
+
 
 ### Tips
 
