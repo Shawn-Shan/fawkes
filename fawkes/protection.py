@@ -57,14 +57,14 @@ class Fawkes(object):
 
     def mode2param(self, mode):
         if mode == 'low':
-            th = 0.0045
-            max_step = 25
+            th = 0.005
+            max_step = 30
             lr = 25
             extractors = ["extractor_2"]
 
         elif mode == 'mid':
             th = 0.012
-            max_step = 50
+            max_step = 75
             lr = 20
             extractors = ["extractor_0", "extractor_2"]
 

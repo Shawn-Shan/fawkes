@@ -145,13 +145,8 @@ class Faces(object):
             p = image_paths[i]
             self.org_faces.append(cur_img)
 
-            if eval_local:
-                margin = 0
-            else:
-                margin = 0.7
-
             if not no_align:
-                align_img = align(cur_img, self.aligner, margin=margin)
+                align_img = align(cur_img, self.aligner)
                 if align_img is None:
                     print("Find 0 face(s) in {}".format(p.split("/")[-1]))
                     self.images_without_face.append(i)
@@ -221,6 +216,7 @@ class Faces(object):
             org_shape = self.cropped_faces_shape[i]
 
             old_square_shape = max([org_shape[0], org_shape[1]])
+
             cur_protected = resize(cur_protected, (old_square_shape, old_square_shape))
             cur_original = resize(cur_original, (old_square_shape, old_square_shape))
 

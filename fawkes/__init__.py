@@ -4,7 +4,7 @@
 # @Link    : https://www.shawnshan.com/
 
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 from .differentiator import FawkesMaskGeneration
 from .protection import main, Fawkes
