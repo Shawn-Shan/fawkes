@@ -133,6 +133,7 @@ class Faces(object):
         self.verbose = verbose
         self.no_align = no_align
         self.aligner = aligner
+        self.margin = 30
         self.org_faces = []
         self.cropped_faces = []
         self.cropped_faces_shape = []
@@ -169,7 +170,8 @@ class Faces(object):
                 if eval_local:
                     base = resize(img, (IMG_SIZE, IMG_SIZE))
                 else:
-                    long_size = max([img.shape[1], img.shape[0]])
+                    long_size = max([img.shape[1], img.shape[0]]) + self.margin
+
                     base = np.ones((long_size, long_size, 3)) * np.mean(img, axis=(0, 1))
 
                     start1, end1 = get_ends(long_size, img.shape[0])
@@ -215,7 +217,7 @@ class Faces(object):
 
             org_shape = self.cropped_faces_shape[i]
 
-            old_square_shape = max([org_shape[0], org_shape[1]])
+            old_square_shape = max([org_shape[0], org_shape[1]]) + self.margin
 
             cur_protected = resize(cur_protected, (old_square_shape, old_square_shape))
             cur_original = resize(cur_original, (old_square_shape, old_square_shape))

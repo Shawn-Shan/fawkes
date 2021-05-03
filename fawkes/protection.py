@@ -57,8 +57,8 @@ class Fawkes(object):
 
     def mode2param(self, mode):
         if mode == 'low':
-            th = 0.005
-            max_step = 30
+            th = 0.004
+            max_step = 40
             lr = 25
             extractors = ["extractor_2"]
 
@@ -133,7 +133,7 @@ class Fawkes(object):
                 continue
             p_img = final_images[i]
             path = image_paths[i]
-            file_name = "{}_{}_cloaked.{}".format(".".join(path.split(".")[:-1]), self.mode, format)
+            file_name = "{}_cloaked.{}".format(".".join(path.split(".")[:-1]), format)
             dump_image(p_img, file_name, format=format)
 
         print("Done!")
