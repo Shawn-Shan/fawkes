@@ -29,12 +29,14 @@ def align(orig_img, aligner):
         if dic['confidence'] < 0.9:
             continue
         x, y, width, height = dic['box']
+
         if width < 30 or height < 30:
             continue
         bb = [y, x, y + height, x + width]
         cropped = orig_img[bb[0]:bb[2], bb[1]:bb[3], :]
         cropped_arr.append(np.copy(cropped))
         bounding_boxes_arr.append(bb)
+
     return cropped_arr, bounding_boxes_arr
 
     # if nrof_faces > 0:
