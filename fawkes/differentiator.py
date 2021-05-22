@@ -191,7 +191,8 @@ class FawkesMaskGeneration:
         simg_tanh = self.preprocess_arctanh(source_imgs)
         if target_imgs is not None:
             timg_tanh = self.preprocess_arctanh(target_imgs)
-        self.modifier = tf.Variable(np.ones(tuple([len(source_imgs)] + self.single_shape), dtype=np.float32) * 1e-4)
+        self.modifier = tf.Variable(np.random.uniform(-1, 1, tuple([len(source_imgs)] + self.single_shape)) * 1e-4,
+                                    dtype=tf.float32)
 
         # make the optimizer
         optimizer = tf.keras.optimizers.Adadelta(float(self.learning_rate))
