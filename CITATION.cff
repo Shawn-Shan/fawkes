@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Fawkes: Protecting Personal Privacy against Unauthorized Deep Learning Models"
+authors: 
+  - family-names: "Shan"
+    given-names: "Shawn
+  - family-names: "Wenger"
+    given-names: "Emily"
+  - family-names: "Zhang"
+    given-names: "Jiayun"
+  - family-names: "Li"
+    given-names: "Huiying"
+  - family-names: "Zheng"
+    given-names: "Haitao"
+  - family-names: "Zhao"
+    given-names: "Ben", "Y."
+  - institution:
+      name: "University of Chicago"
+year: 2020
+license: BSD-3-Clause
+url: "https://github.com/Shawn-Shan/fawkes"
+identifiers:
+    - description: "Paper: Proceedings of USENIX Security '20 (included in 'Proceedings of the
+29th USENIX Security Symposium')"
+      type: url
+      value: https://www.usenix.org/system/files/sec20-shan.pdf
