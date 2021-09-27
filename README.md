@@ -68,7 +68,7 @@ Academic Research Usage
 For academic researchers, whether seeking to improve fawkes or to explore potential vunerability, please refer to the
 following guide to test Fawkes.
 
-To protect a class in a dataset, first move the label's image to a seperate location and run Fawkes. Please
+To protect a class in a dataset, first move the label's image to a separate location and run Fawkes. Please
 use `--debug` option and set `batch-size` to a reasonable number (i.e 16, 32). If the images are already cropped and
 aligned, then also use the `no-align` option.
 
