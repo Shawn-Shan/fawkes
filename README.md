@@ -62,6 +62,16 @@ pip install fawkes
 
 If you don't have root privilege, please try to install on user namespace: `pip install --user fawkes`.
 
+## Installation and Usage with Docker
+
+- On your host machine move or copy your images folder to your normal workspace directory `cd ~/workspace`
+- clone this repository: `git clone [url]` into your normal workspace directory
+- go into cloned repository: `cd fawkes`
+- run `buildDocker.sh`
+- run `startDocker.sh`
+- You should now be in the fawkes container with your normal workspace directory to /home/testuser/workspace
+- You can then run fawkes with something like: e.g. `fawkes -d ./imgs --mode=low`
+- exit from your container: `exit`
 
 Academic Research Usage
 -----------------------
