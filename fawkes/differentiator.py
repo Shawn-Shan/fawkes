@@ -9,7 +9,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from fawkes.utils import preprocess, reverse_preprocess
-from keras.utils import Progbar
+from tensorflow.keras.utils import Progbar
 
 
 class FawkesMaskGeneration:

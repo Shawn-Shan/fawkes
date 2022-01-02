@@ -21,7 +21,7 @@ import zipfile
 import PIL
 import pkg_resources
 import six
-from keras.utils import Progbar
+from tensorflow.keras.utils import Progbar
 from six.moves.urllib.error import HTTPError, URLError
 
 stderr = sys.stderr
