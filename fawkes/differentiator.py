@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.optimizers.legacy import Adadelta
 from fawkes.utils import preprocess, reverse_preprocess
 from keras.utils import Progbar
 
@@ -146,9 +147,9 @@ class FawkesMaskGeneration:
     def compute_feature_loss(self, tape, aimg_raw, simg_raw, aimg_input, timg_input, simg_input):
         """ Compute input space + feature space loss.
         """
-        input_space_loss, dist_raw, input_space_loss_sum, input_space_loss_raw_avg = self.calc_dissim(aimg_raw,
+        input_space_loss, dist_raw, _, input_space_loss_raw_avg = self.calc_dissim(aimg_raw,
                                                                                                       simg_raw)
-        feature_space_loss, feature_space_loss_sum = self.calc_bottlesim(tape, aimg_input, timg_input, simg_input)
+        feature_space_loss, _ = self.calc_bottlesim(tape, aimg_input, timg_input, simg_input)
 
         if self.maximize:
             loss = self.const * tf.square(input_space_loss) - feature_space_loss * self.const_diff
@@ -172,7 +173,7 @@ class FawkesMaskGeneration:
         print('protection cost %f s' % elapsed_time)
         return np.array(adv_imgs)
 
-    def compute_batch(self, source_imgs, target_imgs=None, retry=True):
+    def compute_batch(self, source_imgs, target_imgs=None):
         """ TF2 method to generate the cloak. """
         # preprocess images.
         global progressbar
@@ -195,7 +196,7 @@ class FawkesMaskGeneration:
                                     dtype=tf.float32)
 
         # make the optimizer
-        optimizer = tf.keras.optimizers.Adadelta(float(self.learning_rate))
+        optimizer = Adadelta(float(self.learning_rate))
         const_numpy = np.ones(len(source_imgs)) * self.initial_const
         self.const = tf.Variable(const_numpy, dtype=np.float32)
 

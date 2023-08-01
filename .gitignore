@@ -6,6 +6,7 @@ build/*
 keras/datasets/data/*
 keras/datasets/temp/*
 tags
+fawkes/model/
 fawkes.egg-info
 
 # test-related
@@ -18,3 +19,5 @@ fawkes_dev/protect_personId.txt
 # developer environments
 .idea
 .vscode
+
+photos/*

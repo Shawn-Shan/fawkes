@@ -9,7 +9,6 @@ import errno
 import glob
 import gzip
 import hashlib
-import json
 import os
 import pickle
 import random
@@ -18,7 +17,6 @@ import sys
 import tarfile
 import zipfile
 
-import PIL
 import pkg_resources
 import six
 from keras.utils import Progbar
@@ -26,16 +24,14 @@ from six.moves.urllib.error import HTTPError, URLError
 
 stderr = sys.stderr
 sys.stderr = open(os.devnull, 'w')
-import keras
+from tensorflow.keras.models import load_model
 
 sys.stderr = stderr
-import keras.backend as K
+from tensorflow.keras.backend import image_data_format
 import numpy as np
 import tensorflow as tf
-from PIL import Image, ExifTags
-from keras.layers import Dense, Activation
-from keras.models import Model
-from keras.preprocessing import image
+from PIL import Image, ExifTags, UnidentifiedImageError
+from tensorflow.keras.preprocessing import image
 
 from fawkes.align_face import align
 from six.moves.urllib.request import urlopen
@@ -65,14 +61,6 @@ if sys.version_info[0] == 2:
 else:
     from six.moves.urllib.request import urlretrieve
 
-
-def clip_img(X, preprocessing='raw'):
-    X = reverse_preprocess(X, preprocessing)
-    X = np.clip(X, 0.0, 255.0)
-    X = preprocess(X, preprocessing)
-    return X
-
-
 IMG_SIZE = 112
 PREPROCESS = 'raw'
 
@@ -80,7 +68,7 @@ PREPROCESS = 'raw'
 def load_image(path):
     try:
         img = Image.open(path)
-    except PIL.UnidentifiedImageError:
+    except UnidentifiedImageError:
         return None
     except IsADirectoryError:
         return None
@@ -199,11 +187,7 @@ class Faces(object):
         if preprocessing:
             self.cropped_faces = preprocess(self.cropped_faces, PREPROCESS)
 
-        self.cloaked_cropped_faces = None
         self.cloaked_faces = np.copy(self.org_faces)
-
-    def get_faces(self):
-        return self.cropped_faces
 
     def merge_faces(self, protected_images, original_images):
         if self.no_align:
@@ -242,25 +226,6 @@ def get_ends(longsize, window):
     return start, end
 
 
-def dump_dictionary_as_json(dict, outfile):
-    j = json.dumps(dict)
-    with open(outfile, "wb") as f:
-        f.write(j.encode())
-
-
-def load_victim_model(number_classes, teacher_model=None, end2end=False):
-    for l in teacher_model.layers:
-        l.trainable = end2end
-    x = teacher_model.layers[-1].output
-
-    x = Dense(number_classes)(x)
-    x = Activation('softmax', name="act")(x)
-    model = Model(teacher_model.input, x)
-    opt = keras.optimizers.Adadelta()
-    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
-    return model
-
-
 def resize(img, sz):
     assert np.min(img) >= 0 and np.max(img) <= 255.0
     from keras.preprocessing import image
@@ -288,21 +253,6 @@ def init_gpu(gpu):
             print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPU")
         except RuntimeError as e:
             print(e)
-
-
-def fix_gpu_memory(mem_fraction=1):
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    tf_config = None
-    if tf.test.is_gpu_available():
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=mem_fraction)
-        tf_config = tf.ConfigProto(gpu_options=gpu_options)
-        tf_config.gpu_options.allow_growth = True
-        tf_config.log_device_placement = False
-    init_op = tf.global_variables_initializer()
-    sess = tf.Session(config=tf_config)
-    sess.run(init_op)
-    K.set_session(sess)
-    return sess
 
 
 def preprocess(X, method):
@@ -333,7 +283,7 @@ def reverse_preprocess(X, method):
 
 def imagenet_preprocessing(x, data_format=None):
     if data_format is None:
-        data_format = K.image_data_format()
+        data_format = image_data_format()
     assert data_format in ('channels_last', 'channels_first')
 
     x = np.array(x)
@@ -381,10 +331,9 @@ def imagenet_preprocessing(x, data_format=None):
 
 
 def imagenet_reverse_preprocessing(x, data_format=None):
-    import keras.backend as K
     x = np.array(x)
     if data_format is None:
-        data_format = K.image_data_format()
+        data_format = image_data_format()
     assert data_format in ('channels_last', 'channels_first')
 
     if data_format == 'channels_first':
@@ -411,16 +360,7 @@ def imagenet_reverse_preprocessing(x, data_format=None):
 
 
 def reverse_process_cloaked(x, preprocess='imagenet'):
-    # x = clip_img(x, preprocess)
     return reverse_preprocess(x, preprocess)
-
-
-def build_bottleneck_model(model, cut_off):
-    bottleneck_model = Model(model.input, model.get_layer(cut_off).output)
-    bottleneck_model.compile(loss='categorical_crossentropy',
-                             optimizer='adam',
-                             metrics=['accuracy'])
-    return bottleneck_model
 
 
 def load_extractor(name):
@@ -434,7 +374,7 @@ def load_extractor(name):
     get_file("{}.h5".format(name), "http://mirror.cs.uchicago.edu/fawkes/files/{}.h5".format(name),
              cache_dir=model_dir, cache_subdir='', md5_hash=cur_hash)
 
-    model = keras.models.load_model(model_file)
+    model = load_model(model_file)
     model = Extractor(model)
     return model
 
@@ -450,20 +390,6 @@ class Extractor(object):
 
     def __call__(self, x):
         return self.predict(x)
-
-
-def get_dataset_path(dataset):
-    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
-    if not os.path.exists(os.path.join(model_dir, "config.json")):
-        raise Exception("Please config the datasets before running protection code. See more in README and config.py.")
-
-    config = json.load(open(os.path.join(model_dir, "config.json"), 'r'))
-    if dataset not in config:
-        raise Exception(
-            "Dataset {} does not exist, please download to data/ and add the path to this function... Abort".format(
-                dataset))
-    return config[dataset]['train_dir'], config[dataset]['test_dir'], config[dataset]['num_classes'], config[dataset][
-        'num_images']
 
 
 def dump_image(x, filename, format="png", scale=False):
@@ -505,60 +431,6 @@ def pairwise_l2_distance(A, B):
     SqED[SqED < 0] = 0.0
     ED = np.sqrt(SqED)
     return ED
-
-
-def select_target_label(imgs, feature_extractors_ls, feature_extractors_names, metric='l2'):
-    model_dir = os.path.join(os.path.expanduser('~'), '.fawkes')
-
-    original_feature_x = extractor_ls_predict(feature_extractors_ls, imgs)
-
-    path2emb = load_embeddings(feature_extractors_names)
-
-    items = list([(k, v) for k, v in path2emb.items()])
-    paths = [p[0] for p in items]
-    embs = [p[1] for p in items]
-    embs = np.array(embs)
-
-    pair_dist = pairwise_l2_distance(original_feature_x, embs)
-    pair_dist = np.array(pair_dist)
-
-    max_sum = np.min(pair_dist, axis=0)
-    max_id_ls = np.argsort(max_sum)[::-1]
-
-    max_id = random.choice(max_id_ls[:20])
-
-    target_data_id = paths[int(max_id)]
-    print("target ID: {}".format(target_data_id))
-
-    image_dir = os.path.join(model_dir, "target_data/{}".format(target_data_id))
-
-    os.makedirs(os.path.join(model_dir, "target_data"), exist_ok=True)
-    os.makedirs(image_dir, exist_ok=True)
-    for i in range(10):
-        if os.path.exists(os.path.join(model_dir, "target_data/{}/{}.jpg".format(target_data_id, i))):
-            continue
-        try:
-            get_file("{}.jpg".format(i),
-                     "http://mirror.cs.uchicago.edu/fawkes/files/target_data/{}/{}.jpg".format(target_data_id, i),
-                     cache_dir=model_dir, cache_subdir='target_data/{}/'.format(target_data_id))
-        except Exception:
-            pass
-
-    image_paths = glob.glob(image_dir + "/*.jpg")
-
-    target_images = [image.img_to_array(image.load_img(cur_path)) for cur_path in
-                     image_paths]
-
-    target_images = np.array([resize(x, (IMG_SIZE, IMG_SIZE)) for x in target_images])
-    target_images = preprocess(target_images, PREPROCESS)
-
-    target_images = list(target_images)
-    while len(target_images) < len(imgs):
-        target_images += target_images
-
-    target_images = random.sample(target_images, len(imgs))
-    return np.array(target_images)
-
 
 def l2_norm(x, axis=1):
     """l2 norm"""
