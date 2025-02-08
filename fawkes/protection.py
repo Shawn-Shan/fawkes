@@ -75,7 +75,7 @@ class Fawkes(object):
             extractors = ["extractor_0", "extractor_2"]
 
         else:
-            raise Exception("mode must be one of 'min', 'low', 'mid', 'high'")
+            raise Exception("mode must be one of 'low', 'mid', 'high'")
         return th, max_step, lr, extractors
 
     def run_protection(self, image_paths, th=0.04, sd=1e7, lr=10, max_step=500, batch_size=1, format='png',

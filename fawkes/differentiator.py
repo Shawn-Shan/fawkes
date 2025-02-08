@@ -195,7 +195,7 @@ class FawkesMaskGeneration:
                                     dtype=tf.float32)
 
         # make the optimizer
-        optimizer = tf.keras.optimizers.Adadelta(float(self.learning_rate))
+        optimizer = tf.keras.optimizers.legacy.Adadelta(float(self.learning_rate))
         const_numpy = np.ones(len(source_imgs)) * self.initial_const
         self.const = tf.Variable(const_numpy, dtype=np.float32)
 

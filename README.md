@@ -18,6 +18,25 @@ This code is intended only for personal privacy protection or academic research.
 Usage
 -----
 
+### Local Development (Most reliable and future-proof method of running fawkes)
+
+```commandline
+# Install pyenv before running these commands
+# Instructions to install pyenv vary per OS.
+pyenv install 3.9.0
+pyenv global 3.9.0
+pip install poetry 
+# After this point global python can be anything
+# the fawkes repos .python-version file tells pyenv to use 3.9.0 when inside the fawkes folder.
+
+pip install poetry # Install poetry
+
+pyenv install 3.9.0
+cd fawkes
+poetry install
+poetry run python .\fawkes\protection.py -d ./imgs --mode low
+```
+
 `$ fawkes`
 
 Options:
@@ -33,9 +52,6 @@ Options:
 ### Example
 
 `fawkes -d ./imgs --mode low`
-
-or `python3 protection.py -d ./imgs --mode low`
-
 
 ### Tips
 

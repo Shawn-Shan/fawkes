@@ -1,0 +1,48 @@
+[project]
+name = "fawkes"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Shawn Shan", email = "shawnshan@cs.uchicago.edu"}
+]
+license = "BSD"
+homepage = "https://github.com/Shawn-Shan/fawkes"
+keywords = ["fawkes", "privacy", "ML"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Monitoring",
+]
+
+readme = "README.md"
+requires-python = "~=3.9"
+dependencies = [
+    "numpy (>=1.22,<2.0)",
+    "tensorflow-io-gcs-filesystem (>=0.23.1,<0.24.0)",
+    "tensorflow (==2.12)",
+    "keras (>=2.12.0,<2.13.0)",
+    "setuptools (>=75.8.0,<76.0.0)",
+    "mtcnn (>=0.1.0,<0.2.0)",
+    "pillow (>=11.1.0,<12.0.0)",
+    "bleach (>=6.2.0,<7.0.0)",
+    "pyqt5 (==5.15.2)",
+    # Despite the name amd runs this implementation fine.
+    # There's no built in poetry env variable that'll tell us if an AMD GPU is present (which would imply tensorflow-rocm could be a more efficient implementation).
+    # A script could probably be built that intelligently runs pip install under the hood but this is hard to track for a newbie.
+    "tensorflow-intel (==2.12.0)"
+    
+]
+
+
+[tool.poetry.dependencies]
+python = "~3.9"
+
+[tool.poetry.scripts]
+fawkes = "fawkes:main"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
