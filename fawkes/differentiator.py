@@ -70,11 +70,52 @@ class FawkesMaskGeneration:
         self.tanh_process = tanh_process
 
     @staticmethod
-    def resize_tensor(input_tensor, model_input_shape):
-        if input_tensor.shape[1:] == model_input_shape or model_input_shape[1] is None:
+    def resize_tensor(input_tensor, model_input_shape,
+                      method=tf.image.ResizeMethod.BILINEAR, antialias=True):
+        """
+        Robust resize helper.
+
+        - Accepts numpy arrays or tf.Tensors.
+        - Accepts single image (H,W,C) or batched ([B,H,W,C]) inputs.
+        - If model_input_shape contains None for height or width, returns input_tensor unchanged.
+        - Preserves and returns a tf.Tensor (dtype tf.float32).
+        """
+        # target H, W
+        target_h, target_w = model_input_shape[0], model_input_shape[1]
+
+        # If target dims are None (dynamic model), skip resizing
+        if target_h is None or target_w is None:
             return input_tensor
-        resized_tensor = tf.image.resize(input_tensor, model_input_shape[:2])
-        return resized_tensor
+
+        # Convert numpy array to tf.Tensor if needed; ensure float32 for TF ops
+        if not isinstance(input_tensor, tf.Tensor):
+            input_tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
+        else:
+            # cast to float32 if necessary
+            input_tensor = tf.cast(input_tensor, tf.float32)
+
+        # If a single image without batch dim is provided, add batch dim
+        added_batch = False
+        if input_tensor.shape.rank == 3:
+            input_tensor = tf.expand_dims(input_tensor, axis=0)
+            added_batch = True
+
+        # If static shapes match target, avoid resizing
+        static_shape = input_tensor.shape.as_list()  # [B, H, W, C] if known
+        if static_shape[1] is not None and static_shape[2] is not None:
+            if int(static_shape[1]) == int(target_h) and int(static_shape[2]) == int(target_w):
+                out = input_tensor
+                if added_batch:
+                    out = tf.squeeze(out, axis=0)
+                return tf.cast(out, tf.float32)
+
+        # Perform resize (works with dynamic shapes)
+        resized = tf.image.resize(input_tensor, [int(target_h), int(target_w)], method=method, antialias=antialias)
+
+        if added_batch:
+            resized = tf.squeeze(resized, axis=0)
+
+        return tf.cast(resized, tf.float32)
 
     def preprocess_arctanh(self, imgs):
         """ Do tan preprocess """
@@ -113,7 +154,13 @@ class FawkesMaskGeneration:
         return dist, dist_raw, dist_sum, dist_raw_avg
 
     def calc_bottlesim(self, tape, source_raw, target_raw, original_raw):
-        """ original Fawkes loss function. """
+        """ original Fawkes loss function.
+
+        Improvements:
+        - Use robust resize helper.
+        - Avoid watching model variables inside this function (we only need grads w.r.t. modifier).
+        - Add a small epsilon to scale factors to avoid divide by zero.
+        """
         bottlesim = 0.0
         bottlesim_sum = 0.0
         # make sure everything is the right size.
@@ -121,13 +168,12 @@ class FawkesMaskGeneration:
         cur_aimg_input = self.resize_tensor(source_raw, model_input_shape)
         if target_raw is not None:
             cur_timg_input = self.resize_tensor(target_raw, model_input_shape)
+        else:
+            cur_timg_input = None
+
         for bottleneck_model in self.bottleneck_models:
-            if tape is not None:
-                try:
-                    tape.watch(bottleneck_model.model.variables)
-                except AttributeError:
-                    tape.watch(bottleneck_model.variables)
-            # get the respective feature space reprs.
+            # NOTE: We do not watch bottleneck model variables here to compute model gradients
+            # because the attack only needs gradients w.r.t. the modifier variable.
             bottleneck_a = bottleneck_model(cur_aimg_input)
             if self.maximize:
                 bottleneck_s = bottleneck_model(original_raw)
@@ -137,6 +183,10 @@ class FawkesMaskGeneration:
                 bottleneck_t = bottleneck_model(cur_timg_input)
                 bottleneck_diff = bottleneck_t - bottleneck_a
                 scale_factor = tf.sqrt(tf.reduce_sum(tf.square(bottleneck_t), axis=1))
+
+            # guard against division by zero / extremely small scale
+            scale_factor = tf.maximum(scale_factor, 1e-8)
+
             cur_bottlesim = tf.reduce_sum(tf.square(bottleneck_diff), axis=1)
             cur_bottlesim = cur_bottlesim / scale_factor
             bottlesim += cur_bottlesim
@@ -191,16 +241,19 @@ class FawkesMaskGeneration:
         simg_tanh = self.preprocess_arctanh(source_imgs)
         if target_imgs is not None:
             timg_tanh = self.preprocess_arctanh(target_imgs)
+
+        # initialize modifier once (do not recreate inside the loop)
         self.modifier = tf.Variable(np.random.uniform(-1, 1, tuple([len(source_imgs)] + self.single_shape)) * 1e-4,
                                     dtype=tf.float32)
 
         # make the optimizer
         optimizer = tf.keras.optimizers.Adadelta(float(self.learning_rate))
         const_numpy = np.ones(len(source_imgs)) * self.initial_const
-        self.const = tf.Variable(const_numpy, dtype=np.float32)
+        self.const = tf.Variable(const_numpy.astype(np.float32), dtype=tf.float32)
 
         const_diff_numpy = np.ones(len(source_imgs)) * 1.0
-        self.const_diff = tf.Variable(const_diff_numpy, dtype=np.float32)
+        # create const_diff as a variable once; update it via .assign()
+        self.const_diff = tf.Variable(const_diff_numpy.astype(np.float32), dtype=tf.float32)
 
         # get the modifier
         if self.verbose == 0:
@@ -208,8 +261,8 @@ class FawkesMaskGeneration:
                 self.MAX_ITERATIONS, width=30, verbose=1
             )
         # watch relevant variables.
-        simg_tanh = tf.Variable(simg_tanh, dtype=np.float32)
-        simg_raw = tf.Variable(source_imgs, dtype=np.float32)
+        simg_tanh = tf.Variable(simg_tanh, dtype=tf.float32)
+        simg_raw = tf.Variable(source_imgs, dtype=tf.float32)
         if target_imgs is not None:
             timg_raw = tf.Variable(timg_tanh, dtype=np.float32)
         # run the attack
@@ -248,8 +301,10 @@ class FawkesMaskGeneration:
                 grad = tape.gradient(loss, [self.modifier])
                 optimizer.apply_gradients(zip(grad, [self.modifier]))
 
+            # On first iteration take a small signed step on the modifier (UPDATE in-place)
             if self.it == 1:
-                self.modifier = tf.Variable(self.modifier - tf.sign(grad[0]) * 0.01, dtype=tf.float32)
+                # Use assign_sub to avoid creating a new Variable
+                self.modifier.assign_sub(tf.sign(grad[0]) * 0.01)
 
             for e, (input_dist, feature_d, mod_img) in enumerate(zip(dist_raw, internal_dist, aimg_input)):
                 if e >= nb_imgs:
@@ -274,11 +329,12 @@ class FawkesMaskGeneration:
 
                 if input_dist <= self.l_threshold * 1.1 and (
                         (feature_d < best_bottlesim[e] and (not self.maximize)) or (
-                        feature_d > best_bottlesim[e] and self.maximize)):
+                        feature_d > best_bottlesim[e] and self.maximize))):
                     best_bottlesim[e] = feature_d
                     best_adv[e] = mod_img
 
-            self.const_diff = tf.Variable(const_diff_numpy, dtype=np.float32)
+            # Update const_diff variable in-place to preserve identity and device placement
+            self.const_diff.assign(const_diff_numpy.astype(np.float32))
 
             if self.verbose == 1:
                 print("ITER {:0.2f}  Total Loss: {:.2f} {:0.4f} raw; diff: {:.4f}".format(self.it, loss, input_dist_avg,

@@ -1,0 +1,15 @@
+{
+  "name": "Naseem Samir-Nagi Alsalmi",
+  "license_number": "A 424 622 758 412",
+  "dob": "1999-06-01",
+  "address": "5015 Talbot St, Detroit, MI 48212-2810",
+  "issue_date": "2022-06-24",
+  "expiry_date": "2027-06-01",
+  "sex": "M",
+  "height": "5'10\"",
+  "eye_color": "BRO (Brown)",
+  "donor_status": true,
+  "extracted_by": "assistant",
+  "image_filename": "assets/id/naseemalsalmi_id.png",
+  "privacy_note": "Image file NOT uploaded. Metadata auto-extracted from user-provided image. Explicit consent required before uploading unredacted ID image to the repository."
+}
